@@ -9,11 +9,11 @@ struct ContentView: View {
     @State private var parsed: ParsedMarkdown = ParsedMarkdown(text: "")
     @State private var scrollTargetID: String?
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
-    @AppStorage("appearance") private var appearanceRaw: String = AppearanceMode.system.rawValue
     @AppStorage("contentWidth") private var contentWidthRaw: String = ContentWidth.normal.rawValue
+    @AppStorage(ThemePalette.storageKey) private var themeRaw: String = ThemePalette.rose.rawValue
 
-    private var appearance: AppearanceMode {
-        AppearanceMode(rawValue: appearanceRaw) ?? .system
+    private var theme: ThemePalette {
+        ThemePalette(rawValue: themeRaw) ?? .rose
     }
 
     private var contentWidth: ContentWidth {
@@ -38,7 +38,7 @@ struct ContentView: View {
             .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 320)
         }
         .navigationTitle(selectedFile?.lastPathComponent ?? "SuperMD")
-        .preferredColorScheme(appearance.preferred)
+        .preferredColorScheme(theme.preferredColorScheme)
         .tint(Theme.accent)
         .toolbar {
             ToolbarItem(placement: .navigation) {
@@ -53,7 +53,7 @@ struct ContentView: View {
                 ContentWidthMenu(raw: $contentWidthRaw)
             }
             ToolbarItem(placement: .primaryAction) {
-                AppearanceMenu(raw: $appearanceRaw)
+                ThemeMenu(raw: $themeRaw)
             }
         }
         .onChange(of: selectedFile) { _, newValue in

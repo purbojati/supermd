@@ -11,6 +11,7 @@ struct MermaidBlockView: View {
     @State private var copyState: CopyState = .idle
     @State private var isFullWidth: Bool = false
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage(ThemePalette.storageKey) private var palette: String = ThemePalette.rose.rawValue
 
     enum CopyState {
         case idle, copied, failed
@@ -21,6 +22,7 @@ struct MermaidBlockView: View {
             MermaidWebView(
                 code: code,
                 colorScheme: colorScheme,
+                palette: palette,
                 copyRequest: copyRequest,
                 height: $height,
                 errorMessage: $errorMessage,
@@ -169,6 +171,7 @@ private struct FullWidthToggle: View {
 struct MermaidWebView: NSViewRepresentable {
     let code: String
     let colorScheme: ColorScheme
+    let palette: String
     let copyRequest: UUID?
     @Binding var height: CGFloat
     @Binding var errorMessage: String?
@@ -190,7 +193,7 @@ struct MermaidWebView: NSViewRepresentable {
             webView.isInspectable = true
         }
         webView.loadHTMLString(html(), baseURL: URL(string: "https://supermd.local/"))
-        context.coordinator.lastRendered = (code, colorScheme)
+        context.coordinator.lastRendered = (code, colorScheme, palette)
         context.coordinator.webView = webView
         return webView
     }
@@ -200,8 +203,8 @@ struct MermaidWebView: NSViewRepresentable {
         context.coordinator.webView = webView
 
         let last = context.coordinator.lastRendered
-        if last?.code != code || last?.scheme != colorScheme {
-            context.coordinator.lastRendered = (code, colorScheme)
+        if last?.code != code || last?.scheme != colorScheme || last?.palette != palette {
+            context.coordinator.lastRendered = (code, colorScheme, palette)
             webView.loadHTMLString(html(), baseURL: URL(string: "https://supermd.local/"))
         }
 
@@ -213,9 +216,9 @@ struct MermaidWebView: NSViewRepresentable {
 
     private func html() -> String {
         // Match the SwiftUI Theme.codeBackground that surrounds the WebView so it blends seamlessly.
-        let bg = colorScheme == .dark ? "#1D1218" : "#F6E2EB"
-        let fg = Theme.textHex(colorScheme)
-        let themeVars = colorScheme == .dark ? Self.darkThemeVarsJSON : Self.lightThemeVarsJSON
+        let bg = Theme.codeBackgroundHex
+        let fg = Theme.textHex
+        let themeVars = Theme.mermaidThemeVarsJSON
         let escaped = Data(code.utf8).base64EncodedString()
         return """
         <!doctype html>
@@ -360,86 +363,10 @@ struct MermaidWebView: NSViewRepresentable {
         """
     }
 
-    // Pink palette pushed into Mermaid's `base` theme so diagrams match the app accent.
-    // Reference Mermaid theme keys: primary/secondary/tertiary*, line, text, edge labels, clusters.
-    private static let lightThemeVarsJSON = """
-    {
-      "background": "#F6E2EB",
-      "primaryColor": "#FAD6E2",
-      "primaryTextColor": "#2A141D",
-      "primaryBorderColor": "#C2185B",
-      "secondaryColor": "#F1C4D3",
-      "secondaryTextColor": "#2A141D",
-      "secondaryBorderColor": "#A11550",
-      "tertiaryColor": "#FDF5F8",
-      "tertiaryTextColor": "#2A141D",
-      "tertiaryBorderColor": "#E07AA3",
-      "lineColor": "#C2185B",
-      "textColor": "#2A141D",
-      "mainBkg": "#FAD6E2",
-      "nodeBorder": "#C2185B",
-      "clusterBkg": "#FDF0F4",
-      "clusterBorder": "#E0AFC1",
-      "edgeLabelBackground": "#FDF5F8",
-      "titleColor": "#C2185B",
-      "labelTextColor": "#2A141D",
-      "actorBkg": "#FAD6E2",
-      "actorBorder": "#C2185B",
-      "actorTextColor": "#2A141D",
-      "actorLineColor": "#C2185B",
-      "signalColor": "#2A141D",
-      "signalTextColor": "#2A141D",
-      "labelBoxBkgColor": "#FDF0F4",
-      "labelBoxBorderColor": "#C2185B",
-      "noteBkgColor": "#FFF3F8",
-      "noteTextColor": "#2A141D",
-      "noteBorderColor": "#E07AA3",
-      "activationBkgColor": "#F1C4D3",
-      "activationBorderColor": "#C2185B"
-    }
-    """
-
-    private static let darkThemeVarsJSON = """
-    {
-      "background": "#1D1218",
-      "primaryColor": "#3F1F2C",
-      "primaryTextColor": "#F1E5EB",
-      "primaryBorderColor": "#F06AAA",
-      "secondaryColor": "#2E1E27",
-      "secondaryTextColor": "#F1E5EB",
-      "secondaryBorderColor": "#C2185B",
-      "tertiaryColor": "#251A21",
-      "tertiaryTextColor": "#F1E5EB",
-      "tertiaryBorderColor": "#A11550",
-      "lineColor": "#F06AAA",
-      "textColor": "#F1E5EB",
-      "mainBkg": "#3F1F2C",
-      "nodeBorder": "#F06AAA",
-      "clusterBkg": "#241620",
-      "clusterBorder": "#5A2A3A",
-      "edgeLabelBackground": "#1D1218",
-      "titleColor": "#F06AAA",
-      "labelTextColor": "#F1E5EB",
-      "actorBkg": "#3F1F2C",
-      "actorBorder": "#F06AAA",
-      "actorTextColor": "#F1E5EB",
-      "actorLineColor": "#F06AAA",
-      "signalColor": "#F1E5EB",
-      "signalTextColor": "#F1E5EB",
-      "labelBoxBkgColor": "#2E1E27",
-      "labelBoxBorderColor": "#F06AAA",
-      "noteBkgColor": "#2E1E27",
-      "noteTextColor": "#F1E5EB",
-      "noteBorderColor": "#F06AAA",
-      "activationBkgColor": "#3F1F2C",
-      "activationBorderColor": "#F06AAA"
-    }
-    """
-
     final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         var parent: MermaidWebView
         weak var webView: WKWebView?
-        var lastRendered: (code: String, scheme: ColorScheme)?
+        var lastRendered: (code: String, scheme: ColorScheme, palette: String)?
         var lastCopyRequest: UUID?
 
         init(_ parent: MermaidWebView) { self.parent = parent }

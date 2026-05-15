@@ -49,6 +49,9 @@ struct MarkdownPaneView: View {
     let parsed: ParsedMarkdown
     @Binding var scrollTarget: String?
     let contentWidth: ContentWidth
+    // Observed so changing the palette re-evaluates this view (and all
+    // `BlockView`s it produces) with fresh `Theme.*` colors.
+    @AppStorage(ThemePalette.storageKey) private var _palette: String = ThemePalette.rose.rawValue
 
     var body: some View {
         let textColumnWidth = contentWidth.innerWidth
@@ -58,10 +61,10 @@ struct MarkdownPaneView: View {
                     VStack(spacing: 10) {
                         Image(systemName: "doc.text")
                             .font(.system(size: 38, weight: .light))
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(Theme.tertiaryText)
                         Text("Select a Markdown file")
                             .font(.system(size: 15, weight: .medium, design: Typography.bodyDesign))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.secondaryText)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .padding(60)
@@ -83,6 +86,11 @@ struct MarkdownPaneView: View {
                     .padding(.horizontal, Typography.gutterPadding)
                     .padding(.vertical, Typography.contentVerticalPadding)
                     .frame(maxWidth: .infinity)
+                    // Force LazyVStack to rebuild its mounted rows when the
+                    // theme changes — without this, already-visible rows keep
+                    // their previously-baked AttributedString colors until
+                    // they scroll off-screen and back.
+                    .id(_palette)
                 }
             }
             .background(Theme.background)
@@ -101,6 +109,7 @@ struct MarkdownPaneView: View {
 struct BlockView: View {
     let markup: Markup
     let textColumnWidth: CGFloat
+    @AppStorage(ThemePalette.storageKey) private var _palette: String = ThemePalette.rose.rawValue
 
     var body: some View {
         switch markup {
@@ -131,7 +140,7 @@ struct BlockView: View {
         case let html as HTMLBlock:
             Text(html.rawHTML)
                 .font(.system(.callout, design: .monospaced))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.secondaryText)
                 .textSelection(.enabled)
         default:
             EmptyView()
@@ -141,6 +150,7 @@ struct BlockView: View {
 
 struct HeadingBlockView: View {
     let heading: Heading
+    @AppStorage(ThemePalette.storageKey) private var _palette: String = ThemePalette.rose.rawValue
 
     var body: some View {
         Text(inlineAttributedString(from: heading))
@@ -155,6 +165,7 @@ struct HeadingBlockView: View {
 
 struct CodeBlockView: View {
     let codeBlock: CodeBlock
+    @AppStorage(ThemePalette.storageKey) private var _palette: String = ThemePalette.rose.rawValue
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -162,7 +173,7 @@ struct CodeBlockView: View {
                 HStack {
                     Text(language.lowercased())
                         .font(.system(size: 11, weight: .medium, design: .monospaced))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.secondaryText)
                         .tracking(0.4)
                     Spacer()
                 }
@@ -198,6 +209,7 @@ struct CodeBlockView: View {
 
 struct BlockQuoteView: View {
     let quote: BlockQuote
+    @AppStorage(ThemePalette.storageKey) private var _palette: String = ThemePalette.rose.rawValue
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
@@ -222,6 +234,7 @@ struct BlockQuoteView: View {
 struct ListBlockView: View {
     let items: [ListItem]
     let ordered: Bool
+    @AppStorage(ThemePalette.storageKey) private var _palette: String = ThemePalette.rose.rawValue
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -231,7 +244,7 @@ struct ListBlockView: View {
                         .font(ordered
                               ? .system(size: Typography.bodySize, design: Typography.bodyDesign)
                               : .system(size: Typography.bodySize))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.secondaryText)
                         .frame(minWidth: 20, alignment: .trailing)
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(Array(item.children.enumerated()), id: \.offset) { _, child in
@@ -263,7 +276,9 @@ func inlineAttributedString(from markup: Markup) -> AttributedString {
 private func attributedString(forInline inline: Markup) -> AttributedString {
     switch inline {
     case let text as Markdown.Text:
-        return AttributedString(text.string)
+        var s = AttributedString(text.string)
+        s.foregroundColor = Theme.text
+        return s
     case let emphasis as Emphasis:
         var s = inlineAttributedString(from: emphasis)
         s.inlinePresentationIntent = (s.inlinePresentationIntent ?? []).union(.emphasized)
@@ -294,16 +309,24 @@ private func attributedString(forInline inline: Markup) -> AttributedString {
         let label = plainText(of: image)
         let display = label.isEmpty ? (image.source ?? "image") : label
         var s = AttributedString("🖼 \(display)")
-        s.foregroundColor = Color.secondary
+        s.foregroundColor = Theme.secondaryText
         return s
     case is LineBreak:
-        return AttributedString("\n")
+        var s = AttributedString("\n")
+        s.foregroundColor = Theme.text
+        return s
     case is SoftBreak:
-        return AttributedString(" ")
+        var s = AttributedString(" ")
+        s.foregroundColor = Theme.text
+        return s
     case let html as InlineHTML:
-        return AttributedString(html.rawHTML)
+        var s = AttributedString(html.rawHTML)
+        s.foregroundColor = Theme.text
+        return s
     default:
-        return AttributedString(plainText(of: inline))
+        var s = AttributedString(plainText(of: inline))
+        s.foregroundColor = Theme.text
+        return s
     }
 }
 

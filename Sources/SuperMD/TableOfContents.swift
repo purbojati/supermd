@@ -4,6 +4,7 @@ struct TableOfContentsView: View {
     let headings: [HeadingItem]
     let currentID: String?
     let onSelect: (String) -> Void
+    @AppStorage(ThemePalette.storageKey) private var _palette: String = ThemePalette.rose.rawValue
 
     var body: some View {
         Group {

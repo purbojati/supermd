@@ -18,8 +18,9 @@ struct SuperMDApp: App {
                     AboutPanel.show()
                 }
                 Button("Check for Updates…") {
-                    appDelegate.updaterController.checkForUpdates(nil)
+                    appDelegate.updaterController?.checkForUpdates(nil)
                 }
+                .disabled(appDelegate.updaterController == nil)
             }
             CommandGroup(replacing: .newItem) {
                 Button("Open Folder…") {
@@ -38,23 +39,56 @@ extension Notification.Name {
 // macOS does not yet support per-appearance app icons via .appiconset
 // without the new Icon Composer .icon bundle. So we ship both .icns files
 // (AppIcon.icns + AppIcon-Dark.icns) and swap the running app's icon
-// to match the system appearance — the Dock and About panel update live.
+// to match the macOS system appearance — the Dock and About panel update live.
+// The icon always follows the system theme, independent of the in-app
+// theme palette (the user's chosen palette may force its own color scheme,
+// but the Dock icon shouldn't flip with it).
 final class SuperMDAppDelegate: NSObject, NSApplicationDelegate {
-    let updaterController = SPUStandardUpdaterController(
-        startingUpdater: true,
-        updaterDelegate: nil,
-        userDriverDelegate: nil
-    )
+    // Sparkle requires a valid Info.plist (CFBundleIdentifier + CFBundleVersion).
+    // `swift run` launches a bare executable with neither, so skip the updater
+    // there and only start it for the real .app bundle produced by build-app.sh.
+    let updaterController: SPUStandardUpdaterController? = {
+        let info = Bundle.main.infoDictionary
+        guard info?["CFBundleIdentifier"] != nil,
+              info?["CFBundleVersion"] != nil else {
+            return nil
+        }
+        return SPUStandardUpdaterController(
+            startingUpdater: true,
+            updaterDelegate: nil,
+            userDriverDelegate: nil
+        )
+    }()
 
-    private var appearanceObservation: NSKeyValueObservation?
     private var lightIcon: NSImage?
     private var darkIcon: NSImage?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // When launched as a bare SPM executable (`swift run`) there's no
+        // Info.plist, so AppKit defaults to a background activation policy
+        // and the window never comes forward. Force a foreground app.
+        if Bundle.main.infoDictionary?["CFBundleIdentifier"] == nil {
+            NSApp.setActivationPolicy(.regular)
+            NSApp.activate(ignoringOtherApps: true)
+        }
+
         lightIcon = loadIcon(named: "AppIcon")
         darkIcon  = loadIcon(named: "AppIcon-Dark")
         applyIcon()
-        appearanceObservation = NSApp.observe(\.effectiveAppearance, options: [.new]) { [weak self] _, _ in
+
+        // The macOS system appearance broadcasts this distributed notification
+        // when the user toggles Light/Dark in System Settings, regardless of
+        // any per-app `preferredColorScheme` override.
+        DistributedNotificationCenter.default.addObserver(
+            self,
+            selector: #selector(systemAppearanceChanged),
+            name: Notification.Name("AppleInterfaceThemeChangedNotification"),
+            object: nil
+        )
+    }
+
+    @objc private func systemAppearanceChanged() {
+        DispatchQueue.main.async { [weak self] in
             self?.applyIcon()
         }
     }
@@ -68,7 +102,9 @@ final class SuperMDAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func applyIcon() {
-        let isDark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        // Read the *system* dark-mode state, not NSApp.effectiveAppearance —
+        // the latter follows the in-app theme palette's preferred color scheme.
+        let isDark = UserDefaults.standard.string(forKey: "AppleInterfaceStyle") == "Dark"
         if let image = isDark ? (darkIcon ?? lightIcon) : (lightIcon ?? darkIcon) {
             NSApp.applicationIconImage = image
         }
