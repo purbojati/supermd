@@ -29,6 +29,8 @@ note() { printf "\033[1;34m==>\033[0m %s\n" "$*"; }
 
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$INFO_PLIST")"
 [[ -n "$VERSION" ]] || err "couldn't read version from $INFO_PLIST"
+BUILD_NUMBER="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$INFO_PLIST")"
+[[ -n "$BUILD_NUMBER" ]] || err "couldn't read CFBundleVersion from $INFO_PLIST"
 TAG="v$VERSION"
 note "Releasing $APP_NAME $TAG"
 
@@ -155,7 +157,7 @@ cat > "$APPCAST" <<EOF
     <item>
       <title>Version ${VERSION}</title>
       <pubDate>${PUBDATE}</pubDate>
-      <sparkle:version>${VERSION}</sparkle:version>
+      <sparkle:version>${BUILD_NUMBER}</sparkle:version>
       <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <sparkle:releaseNotesLink>https://github.com/${REPO_SLUG}/releases/tag/${TAG}</sparkle:releaseNotesLink>
