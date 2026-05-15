@@ -299,7 +299,7 @@ enum Theme {
           "primaryTextColor": "\(txt)",
           "primaryBorderColor": "\(accent)",
           "secondaryColor": "\(surface)",
-          "secondaryTextColor": "\(txt)",
+          "secondaryTextColor": "\(mutedTxt)",
           "secondaryBorderColor": "\(accent)",
           "tertiaryColor": "\(elevated)",
           "tertiaryTextColor": "\(txt)",

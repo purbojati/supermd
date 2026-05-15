@@ -63,7 +63,7 @@ extension Notification.Name {
 // The icon always follows the system theme, independent of the in-app
 // theme palette (the user's chosen palette may force its own color scheme,
 // but the Dock icon shouldn't flip with it).
-final class SuperMDAppDelegate: NSObject, NSApplicationDelegate {
+final class SuperMDAppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     // Sparkle requires a valid Info.plist (CFBundleIdentifier + CFBundleVersion).
     // `swift run` launches a bare executable with neither, so skip the updater
     // there and only start it for the real .app bundle produced by build-app.sh.
@@ -82,6 +82,14 @@ final class SuperMDAppDelegate: NSObject, NSApplicationDelegate {
 
     private var lightIcon: NSImage?
     private var darkIcon: NSImage?
+
+    // Set by application(_:open:) on both cold and warm launches.
+    // ContentView observes this via @EnvironmentObject so it handles both cases.
+    @Published var pendingFileURL: URL?
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        pendingFileURL = urls.first
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // When launched as a bare SPM executable (`swift run`) there's no

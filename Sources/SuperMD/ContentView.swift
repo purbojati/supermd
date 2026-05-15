@@ -4,6 +4,7 @@ import AppKit
 struct ContentView: View {
     private static let openFoldersKey = "openFolders"
 
+    @EnvironmentObject private var appDelegate: SuperMDAppDelegate
     @State private var rootURLs: [URL] = ContentView.loadStoredFolders()
     @State private var selectedFile: URL?
     @State private var parsed: ParsedMarkdown = ParsedMarkdown(text: "")
@@ -121,6 +122,10 @@ struct ContentView: View {
         }
         .onAppear {
             watcher.watch(selectedFile)
+            if let url = appDelegate.pendingFileURL {
+                openFile(url)
+                appDelegate.pendingFileURL = nil
+            }
         }
         .onReceive(watcher.changed) { _ in
             reloadCurrent()
@@ -142,6 +147,20 @@ struct ContentView: View {
                 quickOpen.open(roots: rootURLs)
             }
         }
+        .onChange(of: appDelegate.pendingFileURL) { _, url in
+            if let url {
+                openFile(url)
+                appDelegate.pendingFileURL = nil
+            }
+        }
+    }
+
+    private func openFile(_ url: URL) {
+        let parent = url.deletingLastPathComponent()
+        if !rootURLs.contains(parent) {
+            rootURLs.append(parent)
+        }
+        selectedFile = url
     }
 
     private func reloadCurrent() {
