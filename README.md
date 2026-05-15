@@ -39,6 +39,20 @@ swift run -c release
 
 The whole flow is tag-driven. CI does all the building, signing, and appcast updating — there is **nothing to upload by hand.**
 
+### What triggers a release
+
+A release **only** fires when you push a git tag that starts with `v` (e.g. `v0.1.2`, `v1.0.0`). Regular pushes to `main` or any other branch do **not** trigger a release — they just run whatever non-release CI you have, leaving users on their current version. The trigger is configured at `.github/workflows/release.yml`:
+
+```yaml
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+```
+
+`workflow_dispatch` also lets you re-run the release manually from the Actions tab if you ever need to (e.g. CI was down when you tagged).
+
 ### Per-release checklist
 
 1. Pick the new version, e.g. `0.1.2`. Bump these four strings to match:
