@@ -56,13 +56,17 @@ func drawIcon(pixels: CGFloat, variant: IconVariant) -> Data {
     NSGraphicsContext.saveGraphicsState()
     NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
     let ctx = NSGraphicsContext.current!.cgContext
-    let rect = CGRect(x: 0, y: 0, width: pixels, height: pixels)
     let colorSpace = CGColorSpaceCreateDeviceRGB()
 
-    // Squircle background with diagonal gradient
-    let cornerRadius = pixels * 0.2237
+    // Apple's macOS icon template insets the squircle to 824/1024 of the
+    // canvas, leaving transparent margin so the app sits at the same visual
+    // size as system icons in the Dock and app switcher.
+    let squircleSize = pixels * (824.0 / 1024.0)
+    let inset = (pixels - squircleSize) / 2
+    let squircleRect = CGRect(x: inset, y: inset, width: squircleSize, height: squircleSize)
+    let cornerRadius = squircleSize * 0.2237
     let bgPath = CGPath(
-        roundedRect: rect,
+        roundedRect: squircleRect,
         cornerWidth: cornerRadius, cornerHeight: cornerRadius,
         transform: nil
     )
@@ -77,8 +81,8 @@ func drawIcon(pixels: CGFloat, variant: IconVariant) -> Data {
     )!
     ctx.drawLinearGradient(
         gradient,
-        start: CGPoint(x: 0, y: pixels),
-        end:   CGPoint(x: pixels, y: 0),
+        start: CGPoint(x: squircleRect.minX, y: squircleRect.maxY),
+        end:   CGPoint(x: squircleRect.maxX, y: squircleRect.minY),
         options: []
     )
 
@@ -92,12 +96,12 @@ func drawIcon(pixels: CGFloat, variant: IconVariant) -> Data {
     )!
     ctx.drawLinearGradient(
         highlight,
-        start: CGPoint(x: 0, y: pixels),
-        end:   CGPoint(x: 0, y: pixels * 0.48),
+        start: CGPoint(x: squircleRect.midX, y: squircleRect.maxY),
+        end:   CGPoint(x: squircleRect.midX, y: squircleRect.minY + squircleSize * 0.48),
         options: []
     )
 
-    let fontSize = pixels * 0.56
+    let fontSize = squircleSize * 0.56
     var fontDescriptor = NSFontDescriptor(name: "New York", size: fontSize)
     if let bold = fontDescriptor.withSymbolicTraits(.bold) as NSFontDescriptor? {
         fontDescriptor = bold
@@ -112,22 +116,22 @@ func drawIcon(pixels: CGFloat, variant: IconVariant) -> Data {
     let textAttrs: [NSAttributedString.Key: Any] = [
         .font: font,
         .foregroundColor: palette.text,
-        .kern: -pixels * 0.012,
+        .kern: -squircleSize * 0.012,
         .paragraphStyle: paragraph
     ]
     let text = NSAttributedString(string: "md", attributes: textAttrs)
     let textSize = text.size()
     let textRect = CGRect(
-        x: (pixels - textSize.width) / 2,
-        y: (pixels - textSize.height) / 2 - pixels * 0.045,
+        x: squircleRect.minX + (squircleSize - textSize.width) / 2,
+        y: squircleRect.minY + (squircleSize - textSize.height) / 2 - squircleSize * 0.045,
         width:  textSize.width,
         height: textSize.height
     )
 
     ctx.saveGState()
     ctx.setShadow(
-        offset: CGSize(width: 0, height: -pixels * 0.005),
-        blur: pixels * 0.012,
+        offset: CGSize(width: 0, height: -squircleSize * 0.005),
+        blur: squircleSize * 0.012,
         color: NSColor.black.withAlphaComponent(0.22).cgColor
     )
     text.draw(in: textRect)
@@ -137,11 +141,11 @@ func drawIcon(pixels: CGFloat, variant: IconVariant) -> Data {
 
     ctx.saveGState()
     ctx.addPath(CGPath(
-        roundedRect: rect.insetBy(dx: 0.5, dy: 0.5),
+        roundedRect: squircleRect.insetBy(dx: 0.5, dy: 0.5),
         cornerWidth: cornerRadius, cornerHeight: cornerRadius,
         transform: nil
     ))
-    ctx.setLineWidth(max(1, pixels * 0.0015))
+    ctx.setLineWidth(max(1, squircleSize * 0.0015))
     ctx.setStrokeColor(NSColor.white.withAlphaComponent(palette.edgeAlpha).cgColor)
     ctx.strokePath()
     ctx.restoreGState()
