@@ -11,10 +11,10 @@ struct TableOfContentsView: View {
                 VStack(spacing: 8) {
                     Image(systemName: "list.bullet.indent")
                         .font(.system(size: 22, weight: .light))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(Theme.tertiaryText)
                     Text("No headings")
                         .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.secondaryText)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -23,7 +23,7 @@ struct TableOfContentsView: View {
                         Text("Contents")
                             .font(.system(size: 11, weight: .semibold))
                             .tracking(0.8)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.accent)
                             .textCase(.uppercase)
                             .padding(.horizontal, 14)
                             .padding(.top, 14)
@@ -39,8 +39,10 @@ struct TableOfContentsView: View {
                     }
                     .padding(.bottom, 12)
                 }
+                .scrollContentBackground(.hidden)
             }
         }
+        .background(Theme.surface)
         .navigationTitle("Contents")
     }
 }
@@ -55,7 +57,7 @@ private struct TOCRow: View {
         Button(action: onTap) {
             HStack(spacing: 0) {
                 Rectangle()
-                    .fill(isActive ? Color.accentColor : Color.clear)
+                    .fill(isActive ? Theme.accent : Color.clear)
                     .frame(width: 2)
                 Spacer().frame(width: max(0, CGFloat((heading.level - 1) * 12)))
                 Text(heading.text)
@@ -76,14 +78,14 @@ private struct TOCRow: View {
     }
 
     private var foreground: Color {
-        if isActive { return .accentColor }
-        if heading.level <= 2 { return Color(nsColor: .labelColor) }
-        return Color(nsColor: .secondaryLabelColor)
+        if isActive { return Theme.accent }
+        if heading.level <= 2 { return Theme.text }
+        return Theme.secondaryText
     }
 
     private var rowBackground: Color {
-        if isActive { return Color.accentColor.opacity(0.08) }
-        if hovering { return Color(nsColor: .quaternaryLabelColor).opacity(0.25) }
+        if isActive { return Theme.accentSoft }
+        if hovering { return Theme.hover }
         return .clear
     }
 

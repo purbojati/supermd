@@ -38,6 +38,13 @@ struct BlockEntry: Identifiable {
     let markup: Markup
 }
 
+private func isFullBleed(_ markup: Markup) -> Bool {
+    if let cb = markup as? CodeBlock, (cb.language ?? "").lowercased() == "mermaid" {
+        return true
+    }
+    return false
+}
+
 struct MarkdownPaneView: View {
     let parsed: ParsedMarkdown
     @Binding var scrollTarget: String?
@@ -57,21 +64,25 @@ struct MarkdownPaneView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .padding(60)
                 } else {
-                    VStack(alignment: .leading, spacing: 0) {
-                        LazyVStack(alignment: .leading, spacing: Typography.blockSpacing) {
-                            ForEach(parsed.blocks) { entry in
+                    LazyVStack(spacing: Typography.blockSpacing) {
+                        ForEach(parsed.blocks) { entry in
+                            if isFullBleed(entry.markup) {
                                 BlockView(markup: entry.markup)
                                     .id(entry.id)
+                                    .frame(maxWidth: .infinity)
+                            } else {
+                                BlockView(markup: entry.markup)
+                                    .id(entry.id)
+                                    .frame(maxWidth: Typography.contentInnerWidth, alignment: .leading)
                             }
                         }
-                        .padding(.horizontal, Typography.contentHorizontalPadding)
-                        .padding(.vertical, Typography.contentVerticalPadding)
-                        .frame(maxWidth: Typography.contentMaxWidth, alignment: .leading)
                     }
-                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.horizontal, Typography.gutterPadding)
+                    .padding(.vertical, Typography.contentVerticalPadding)
+                    .frame(maxWidth: .infinity)
                 }
             }
-            .background(Color(nsColor: .textBackgroundColor))
+            .background(Theme.background)
             .onChange(of: scrollTarget) { _, target in
                 guard let target else { return }
                 withAnimation(.easeInOut(duration: 0.25)) {
@@ -95,7 +106,7 @@ struct BlockView: View {
             Text(inlineAttributedString(from: paragraph))
                 .font(Typography.body)
                 .lineSpacing(Typography.bodyLineSpacing)
-                .foregroundStyle(Color(nsColor: .labelColor))
+                .foregroundStyle(Theme.text)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
         case let code as CodeBlock:
@@ -130,7 +141,7 @@ struct HeadingBlockView: View {
     var body: some View {
         Text(inlineAttributedString(from: heading))
             .font(Typography.heading(level: heading.level))
-            .foregroundStyle(Color(nsColor: .labelColor))
+            .foregroundStyle(Theme.text)
             .padding(.top, Typography.headingTopPadding(level: heading.level))
             .padding(.bottom, Typography.headingBottomPadding(level: heading.level))
             .textSelection(.enabled)
@@ -153,10 +164,10 @@ struct CodeBlockView: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 6)
-                .background(Color(nsColor: .quaternaryLabelColor).opacity(0.35))
+                .background(Theme.inlineCodeFill)
                 .overlay(
                     Rectangle()
-                        .fill(Color(nsColor: .separatorColor).opacity(0.6))
+                        .fill(Theme.border.opacity(0.7))
                         .frame(height: 1),
                     alignment: .bottom
                 )
@@ -165,17 +176,18 @@ struct CodeBlockView: View {
                 Text(codeBlock.code.trimmingCharacters(in: .newlines))
                     .font(.system(size: 13, design: .monospaced))
                     .lineSpacing(3)
+                    .foregroundStyle(Theme.text)
                     .textSelection(.enabled)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 14)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .background(Color(nsColor: .controlBackgroundColor))
+        .background(Theme.codeBackground)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(Color(nsColor: .separatorColor).opacity(0.6), lineWidth: 1)
+                .stroke(Theme.border, lineWidth: 1)
         )
     }
 }
@@ -186,7 +198,7 @@ struct BlockQuoteView: View {
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
             RoundedRectangle(cornerRadius: 2)
-                .fill(Color.accentColor.opacity(0.55))
+                .fill(Theme.accentBorder)
                 .frame(width: 3)
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(Array(quote.children.enumerated()), id: \.offset) { _, child in
@@ -195,7 +207,7 @@ struct BlockQuoteView: View {
             }
             .padding(.leading, 16)
             .padding(.vertical, 4)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Theme.secondaryText)
             .italic()
         }
     }
@@ -259,13 +271,14 @@ private func attributedString(forInline inline: Markup) -> AttributedString {
     case let code as InlineCode:
         var s = AttributedString(code.code)
         s.font = .system(size: Typography.bodySize - 1, design: .monospaced)
-        s.backgroundColor = Color(nsColor: .quaternaryLabelColor).opacity(0.45)
+        s.backgroundColor = Theme.inlineCodeFill
+        s.foregroundColor = Theme.accent
         return s
     case let link as Markdown.Link:
         var s = inlineAttributedString(from: link)
         if let dest = link.destination, let url = URL(string: dest) {
             s.link = url
-            s.foregroundColor = Color.accentColor
+            s.foregroundColor = Theme.accent
             s.underlineStyle = Text.LineStyle.single
         }
         return s

@@ -2,7 +2,9 @@ import SwiftUI
 import AppKit
 
 struct ContentView: View {
-    @State private var rootURL: URL?
+    private static let openFoldersKey = "openFolders"
+
+    @State private var rootURLs: [URL] = ContentView.loadStoredFolders()
     @State private var selectedFile: URL?
     @State private var parsed: ParsedMarkdown = ParsedMarkdown(text: "")
     @State private var scrollTargetID: String?
@@ -15,8 +17,12 @@ struct ContentView: View {
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            FileBrowserView(rootURL: $rootURL, selectedFile: $selectedFile)
-                .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 360)
+            FileBrowserView(
+                rootURLs: $rootURLs,
+                selectedFile: $selectedFile,
+                onAddFolder: openFolder
+            )
+            .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 360)
         } content: {
             MarkdownPaneView(parsed: parsed, scrollTarget: $scrollTargetID)
                 .navigationSplitViewColumnWidth(min: 400, ideal: 640)
@@ -28,12 +34,13 @@ struct ContentView: View {
         }
         .navigationTitle(selectedFile?.lastPathComponent ?? "SuperMD")
         .preferredColorScheme(appearance.preferred)
+        .tint(Theme.accent)
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 Button {
                     openFolder()
                 } label: {
-                    Label("Open Folder", systemImage: "folder")
+                    Label("Open Folder", systemImage: "folder.badge.plus")
                 }
                 .help("Open Folder (⌘O)")
             }
@@ -44,6 +51,9 @@ struct ContentView: View {
         .onChange(of: selectedFile) { _, newValue in
             loadMarkdown(from: newValue)
         }
+        .onChange(of: rootURLs) { _, urls in
+            UserDefaults.standard.set(urls.map { $0.path }, forKey: Self.openFoldersKey)
+        }
         .onReceive(NotificationCenter.default.publisher(for: .openFolderRequest)) { _ in
             openFolder()
         }
@@ -53,13 +63,13 @@ struct ContentView: View {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.prompt = "Open"
-        panel.message = "Choose a folder containing Markdown files"
-        if panel.runModal() == .OK, let url = panel.url {
-            rootURL = url
-            selectedFile = nil
-            parsed = ParsedMarkdown(text: "")
+        panel.allowsMultipleSelection = true
+        panel.prompt = "Add"
+        panel.message = "Choose one or more folders containing Markdown files"
+        if panel.runModal() == .OK {
+            for url in panel.urls where !rootURLs.contains(url) {
+                rootURLs.append(url)
+            }
         }
     }
 
@@ -71,5 +81,13 @@ struct ContentView: View {
         let text = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
         parsed = ParsedMarkdown(text: text)
         scrollTargetID = nil
+    }
+
+    private static func loadStoredFolders() -> [URL] {
+        let paths = UserDefaults.standard.stringArray(forKey: openFoldersKey) ?? []
+        let fm = FileManager.default
+        return paths
+            .map { URL(fileURLWithPath: $0) }
+            .filter { fm.fileExists(atPath: $0.path) }
     }
 }

@@ -9,6 +9,10 @@ enum Typography {
     static let contentHorizontalPadding: CGFloat = 56
     static let contentVerticalPadding: CGFloat = 40
     static let blockSpacing: CGFloat = 20
+    /// The width of the text column itself (inside the 740pt page).
+    static let contentInnerWidth: CGFloat = contentMaxWidth - contentHorizontalPadding * 2
+    /// Side gutter for full-bleed blocks (e.g. mermaid) that ignore the text column.
+    static let gutterPadding: CGFloat = 28
 
     static var body: Font { .system(size: bodySize, design: bodyDesign) }
     static var bodyEmphasized: Font { .system(size: bodySize, design: bodyDesign).italic() }
