@@ -6,9 +6,19 @@ struct ContentView: View {
 
     @State private var rootURLs: [URL] = ContentView.loadStoredFolders()
     @State private var selectedFile: URL?
+    @State private var rawText: String = ""
     @State private var parsed: ParsedMarkdown = ParsedMarkdown(text: "")
     @State private var scrollTargetID: String?
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
+
+    // Edit-mode state
+    @State private var isEditing: Bool = false
+    @State private var isDirty: Bool = false
+    @State private var saveTask: Task<Void, Never>? = nil
+    /// Brief window during which we ignore file-watcher events, so our own
+    /// atomic save doesn't trip a reload that clobbers in-flight edits.
+    @State private var ignoreWatcherUntil: Date = .distantPast
+
     @StateObject private var search = SearchState()
     @StateObject private var quickOpen = QuickOpenState()
     @StateObject private var watcher = FileWatcher()
@@ -21,6 +31,29 @@ struct ContentView: View {
 
     private var contentWidth: ContentWidth {
         ContentWidth(rawValue: contentWidthRaw) ?? .normal
+    }
+
+    /// Binding handed to the editor — every keystroke re-parses, marks dirty,
+    /// schedules an autosave, and refreshes find matches. Loading from disk
+    /// writes `rawText` directly (not through this setter) so it doesn't
+    /// flip the dirty bit.
+    private var editorBinding: Binding<String> {
+        Binding(
+            get: { rawText },
+            set: { newValue in
+                guard newValue != rawText else { return }
+                rawText = newValue
+                parsed = ParsedMarkdown(text: newValue)
+                isDirty = true
+                search.updateMatches(in: parsed)
+                scheduleAutoSave()
+            }
+        )
+    }
+
+    private var titleText: String {
+        let base = selectedFile?.lastPathComponent ?? "SuperMD"
+        return isDirty ? "\(base) — Edited" : base
     }
 
     var body: some View {
@@ -39,13 +72,24 @@ struct ContentView: View {
                     }
                     .transition(.move(edge: .top).combined(with: .opacity))
                 }
-                MarkdownPaneView(
-                    parsed: parsed,
-                    scrollTarget: $scrollTargetID,
-                    contentWidth: contentWidth,
-                    currentMatchBlockID: search.currentMatchBlockID,
-                    findQuery: search.findQuery
-                )
+                if isEditing {
+                    EditorSplitPane(
+                        text: editorBinding,
+                        scrollTarget: $scrollTargetID,
+                        parsed: parsed,
+                        contentWidth: contentWidth,
+                        currentMatchBlockID: search.currentMatchBlockID,
+                        findQuery: search.findQuery
+                    )
+                } else {
+                    MarkdownPaneView(
+                        parsed: parsed,
+                        scrollTarget: $scrollTargetID,
+                        contentWidth: contentWidth,
+                        currentMatchBlockID: search.currentMatchBlockID,
+                        findQuery: search.findQuery
+                    )
+                }
             }
             .navigationSplitViewColumnWidth(min: 400, ideal: 640)
         } detail: {
@@ -54,7 +98,7 @@ struct ContentView: View {
             }
             .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 320)
         }
-        .navigationTitle(selectedFile?.lastPathComponent ?? "SuperMD")
+        .navigationTitle(titleText)
         .preferredColorScheme(theme.preferredColorScheme)
         .tint(Theme.accent)
         .toolbar {
@@ -65,6 +109,19 @@ struct ContentView: View {
                     Label("Open Folder", systemImage: "folder.badge.plus")
                 }
                 .help("Open Folder (⌘O)")
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    toggleEditing()
+                } label: {
+                    Label(
+                        isEditing ? "Editing" : "Edit",
+                        systemImage: isEditing ? "pencil.circle.fill" : "pencil"
+                    )
+                    .foregroundStyle(isEditing ? Theme.accent : Color.primary)
+                }
+                .disabled(selectedFile == nil)
+                .help(isEditing ? "Stop editing (⌘E)" : "Edit (⌘E)")
             }
             ToolbarItem(placement: .primaryAction) {
                 Button {
@@ -108,7 +165,12 @@ struct ContentView: View {
             )
         }
         .animation(.easeOut(duration: 0.15), value: search.findBarVisible)
-        .onChange(of: selectedFile) { _, newValue in
+        .animation(.easeOut(duration: 0.15), value: isEditing)
+        .onChange(of: selectedFile) { oldValue, newValue in
+            // Flush any pending autosave on the file we're leaving.
+            if isDirty, oldValue != nil {
+                performSaveNow(to: oldValue)
+            }
             loadMarkdown(from: newValue)
             search.updateMatches(in: parsed)
             watcher.watch(newValue)
@@ -123,8 +185,19 @@ struct ContentView: View {
             watcher.watch(selectedFile)
         }
         .onReceive(watcher.changed) { _ in
+            // Our own atomic save fires the watcher — ignore that brief echo.
+            if Date() < ignoreWatcherUntil { return }
+            // While editing, the editor buffer is the source of truth.
+            // Reloading from disk would discard the user's in-progress edits.
+            if isEditing { return }
             reloadCurrent()
             search.updateMatches(in: parsed)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willResignActiveNotification)) { _ in
+            if isDirty { performSaveNow() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+            if isDirty { performSaveNow() }
         }
         .onReceive(NotificationCenter.default.publisher(for: .openFolderRequest)) { _ in
             openFolder()
@@ -142,12 +215,58 @@ struct ContentView: View {
                 quickOpen.open(roots: rootURLs)
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .toggleEditModeRequest)) { _ in
+            toggleEditing()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .saveFileRequest)) { _ in
+            performSaveNow()
+        }
+    }
+
+    // MARK: - Edit mode
+
+    private func toggleEditing() {
+        if isEditing {
+            if isDirty { performSaveNow() }
+            isEditing = false
+        } else {
+            guard selectedFile != nil else { return }
+            isEditing = true
+        }
+    }
+
+    private func scheduleAutoSave() {
+        saveTask?.cancel()
+        saveTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 1_000_000_000) // 1s debounce
+            if Task.isCancelled { return }
+            performSaveNow()
+        }
+    }
+
+    private func performSaveNow(to overrideURL: URL? = nil) {
+        saveTask?.cancel()
+        saveTask = nil
+        guard let url = overrideURL ?? selectedFile else { return }
+        guard isDirty else { return }
+        do {
+            try rawText.write(to: url, atomically: true, encoding: .utf8)
+            isDirty = false
+            // Atomic writes use rename, which the watcher reports as
+            // .rename → reopen → changed. Skip it for a moment.
+            ignoreWatcherUntil = Date().addingTimeInterval(0.6)
+        } catch {
+            // Lightweight mode: surface failures via the dirty flag (stays on)
+            // rather than a modal. The next autosave or ⌘S will retry.
+        }
     }
 
     private func reloadCurrent() {
         guard let url = selectedFile else { return }
         let text = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+        rawText = text
         parsed = ParsedMarkdown(text: text)
+        isDirty = false
     }
 
     private func openFolder() {
@@ -166,11 +285,15 @@ struct ContentView: View {
 
     private func loadMarkdown(from url: URL?) {
         guard let url else {
+            rawText = ""
             parsed = ParsedMarkdown(text: "")
+            isDirty = false
             return
         }
         let text = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+        rawText = text
         parsed = ParsedMarkdown(text: text)
+        isDirty = false
         scrollTargetID = nil
     }
 

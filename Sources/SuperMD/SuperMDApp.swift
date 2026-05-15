@@ -30,6 +30,11 @@ struct SuperMDApp: App {
             }
             CommandGroup(after: .pasteboard) {
                 Divider()
+                Button("Toggle Edit Mode") {
+                    NotificationCenter.default.post(name: .toggleEditModeRequest, object: nil)
+                }
+                .keyboardShortcut("e", modifiers: [.command])
+                Divider()
                 Button("Find…") {
                     NotificationCenter.default.post(name: .findInFileRequest, object: nil)
                 }
@@ -44,16 +49,23 @@ struct SuperMDApp: App {
                     NotificationCenter.default.post(name: .quickOpenRequest, object: nil)
                 }
                 .keyboardShortcut("p", modifiers: [.command])
+                Divider()
+                Button("Save") {
+                    NotificationCenter.default.post(name: .saveFileRequest, object: nil)
+                }
+                .keyboardShortcut("s", modifiers: [.command])
             }
         }
     }
 }
 
 extension Notification.Name {
-    static let openFolderRequest    = Notification.Name("supermd.openFolderRequest")
-    static let findInFileRequest    = Notification.Name("supermd.findInFileRequest")
-    static let folderSearchRequest  = Notification.Name("supermd.folderSearchRequest")
-    static let quickOpenRequest     = Notification.Name("supermd.quickOpenRequest")
+    static let openFolderRequest      = Notification.Name("supermd.openFolderRequest")
+    static let findInFileRequest      = Notification.Name("supermd.findInFileRequest")
+    static let folderSearchRequest    = Notification.Name("supermd.folderSearchRequest")
+    static let quickOpenRequest       = Notification.Name("supermd.quickOpenRequest")
+    static let toggleEditModeRequest  = Notification.Name("supermd.toggleEditModeRequest")
+    static let saveFileRequest        = Notification.Name("supermd.saveFileRequest")
 }
 
 // macOS does not yet support per-appearance app icons via .appiconset
@@ -258,6 +270,8 @@ private struct AboutView: View {
             VStack(spacing: 4) {
                 row("⌘O",          "Open folder")
                 row("⌘P",          "Quick open")
+                row("⌘E",          "Toggle edit mode")
+                row("⌘S",          "Save")
                 row("⌘F",          "Find in file")
                 row("⇧⌘F",         "Find in folders")
                 row("⌘G / ⇧⌘G",    "Next / previous match")
