@@ -35,38 +35,74 @@ Or just run it directly without bundling:
 swift run -c release
 ```
 
-## Releasing
+## Releasing a new version
 
-Push a tag like `v0.1.0` and the GitHub Actions workflow at `.github/workflows/release.yml` will build a universal `.app`, zip it, attach it to a new GitHub Release, EdDSA-sign the zip, and commit an updated `appcast.xml` to `main` so existing users get an auto-update prompt.
+The whole flow is tag-driven. CI does all the building, signing, and appcast updating — there is **nothing to upload by hand.**
 
-```sh
-git tag v0.1.0
-git push origin v0.1.0
-```
+### Per-release checklist
 
-Remember to bump `CFBundleShortVersionString` and `CFBundleVersion` in `Resources/Info.plist` before tagging — Sparkle compares those against the appcast.
-
-### One-time auto-update setup (Sparkle)
-
-The release workflow expects an EdDSA keypair so it can sign updates. Generate one **once**, locally:
-
-1. Resolve packages so Sparkle's tools are available:
+1. Pick the new version, e.g. `0.1.2`. Bump these four strings to match:
+   - `Resources/Info.plist` → `CFBundleShortVersionString` (e.g. `0.1.2`) and `CFBundleVersion` (monotonically increasing integer)
+   - `Sources/SuperMD/SuperMDApp.swift` → the `.applicationVersion` and `.version` values inside `AboutPanel.show()` (these power the About window)
+2. Commit the version bump (plus any other changes going out).
+3. Tag and push:
    ```sh
-   swift package resolve
+   git tag v0.1.2
+   git push origin main
+   git push origin v0.1.2
    ```
-2. Find and run `generate_keys`:
+4. Watch the run:
    ```sh
-   find .build/artifacts -name generate_keys -perm -u+x -exec {} \;
+   gh run watch --workflow=release.yml --exit-status
    ```
-   It prints a public key and stores the private key in your login Keychain.
-3. Paste the public key into `Resources/Info.plist` as the value of `SUPublicEDKey` (replacing the `REPLACE_WITH_SPARKLE_PUBLIC_KEY` placeholder).
-4. Export the private key:
-   ```sh
-   find .build/artifacts -name generate_keys -perm -u+x -exec {} -x ./sparkle_private_key \;
-   ```
-   Add its contents as a GitHub Actions secret named **`SPARKLE_PRIVATE_KEY`** (Settings → Secrets and variables → Actions). Delete `sparkle_private_key` afterward — **never commit it.**
+5. Verify:
+   - Release page: <https://github.com/purbojati/supermd/releases/latest>
+   - Appcast: <https://raw.githubusercontent.com/purbojati/supermd/main/appcast.xml> — should list the new `<sparkle:version>` and a valid `sparkle:edSignature`
 
-That's it. From the second release onward, anyone running SuperMD will be offered the update automatically (the menu also has **SuperMD → Check for Updates…**).
+Within 24 h (or immediately via **SuperMD → Check for Updates…**), every running copy of SuperMD will be offered the update.
+
+### What the CI workflow does
+
+`.github/workflows/release.yml`, on `push` of a `v*` tag:
+
+1. `swift package resolve` (fetches Sparkle's XCFramework + tools).
+2. `./scripts/build-app.sh` — builds universal `SuperMD.app`, embeds `Sparkle.framework`, ad-hoc codesigns, zips to `.build/SuperMD.zip`.
+3. Signs the zip with EdDSA using the `SPARKLE_PRIVATE_KEY` repo secret → emits `sparkle:edSignature="…"`.
+4. Generates `appcast.xml` with a single `<item>` for this version (download URL points at the GitHub Release asset).
+5. Commits `appcast.xml` back to `main` as `github-actions[bot]`.
+6. Creates the GitHub Release with `SuperMD.zip` attached and auto-generated release notes.
+
+If any step fails the release won't go out, so just re-run the failed job (`gh run rerun <id> --failed`) after fixing.
+
+### Sparkle setup (already done — kept here as a reference)
+
+You only need to do this **once per project.** It's already done for SuperMD, but if you ever rotate the key or fork the repo:
+
+1. `swift package resolve`
+2. Generate the keypair (private key lands in your login Keychain):
+   ```sh
+   .build/artifacts/sparkle/Sparkle/bin/generate_keys
+   ```
+   Copy the printed public key into `Resources/Info.plist` as `SUPublicEDKey`.
+3. Export the private key and load it into the `SPARKLE_PRIVATE_KEY` GitHub Actions secret:
+   ```sh
+   KEY="$(mktemp -u)"
+   .build/artifacts/sparkle/Sparkle/bin/generate_keys -x "$KEY"
+   gh secret set SPARKLE_PRIVATE_KEY --body "$(cat "$KEY")"
+   rm -f "$KEY"
+   ```
+   **Never commit the private key.** If you rotate it, every released app pinned to the old public key will stop accepting updates until users reinstall, so this is rare.
+
+### Where things live
+
+| What                    | Where                                                                                     |
+| ----------------------- | ----------------------------------------------------------------------------------------- |
+| EdDSA private key       | Local macOS Keychain (account: `ed25519`) + `SPARKLE_PRIVATE_KEY` GitHub Actions secret    |
+| EdDSA public key        | `Resources/Info.plist` → `SUPublicEDKey`                                                  |
+| Update feed URL         | `Resources/Info.plist` → `SUFeedURL` (currently raw.githubusercontent.com on `main`)      |
+| Released `.zip`         | GitHub Releases, attached to each `v*` tag                                                |
+| Live appcast            | `appcast.xml` on `main`, served via raw.githubusercontent.com                             |
+| In-app update entry     | `SuperMD → Check for Updates…` (also auto-checks every 24 h)                              |
 
 ## Project layout
 
