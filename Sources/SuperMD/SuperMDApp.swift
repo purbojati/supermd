@@ -169,17 +169,38 @@ private struct AboutView: View {
     }
 
     private var versionLine: String {
-        let info = Bundle.main.infoDictionary
-        let short = info?["CFBundleShortVersionString"] as? String
-        let build = info?["CFBundleVersion"] as? String
+        let info = Self.versionInfo()
+        let short = info["CFBundleShortVersionString"] as? String
+        let build = info["CFBundleVersion"] as? String
         switch (short, build) {
         case let (s?, b?) where !s.isEmpty && !b.isEmpty && s != b:
-            return "Version \(s) (\(b))"
+            return "Version \(s)  ·  Build \(b)"
         case let (s?, _) where !s.isEmpty:
             return "Version \(s)"
         default:
             return "Development build"
         }
+    }
+
+    /// Tries Bundle.main first (real .app), then falls back to reading
+    /// Resources/Info.plist directly from the source tree — so `swift run`
+    /// builds also display the real version instead of "Development build".
+    private static func versionInfo() -> [String: Any] {
+        if let info = Bundle.main.infoDictionary,
+           info["CFBundleShortVersionString"] != nil {
+            return info
+        }
+        let pkgRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()   // .../Sources/SuperMD
+            .deletingLastPathComponent()   // .../Sources
+            .deletingLastPathComponent()   // package root
+        let plistURL = pkgRoot.appendingPathComponent("Resources/Info.plist")
+        guard let data = try? Data(contentsOf: plistURL),
+              let plist = try? PropertyListSerialization
+                .propertyList(from: data, format: nil) as? [String: Any] else {
+            return [:]
+        }
+        return plist
     }
 
     var body: some View {
@@ -196,8 +217,13 @@ private struct AboutView: View {
                     .font(.system(size: 26, weight: .semibold, design: .serif))
                     .foregroundStyle(Theme.text)
                 Text(versionLine)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Theme.secondaryText)
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .foregroundStyle(Theme.accent)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 3)
+                    .background(
+                        Capsule().fill(Theme.accentSoft)
+                    )
                 Text("A native macOS Markdown viewer.")
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.secondaryText)
