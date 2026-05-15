@@ -132,66 +132,157 @@ final class SuperMDAppDelegate: NSObject, NSApplicationDelegate {
 }
 
 enum AboutPanel {
+    private static var window: NSWindow?
+
     static func show() {
-        let credits = NSMutableAttributedString()
-
-        let centered = NSMutableParagraphStyle()
-        centered.alignment = .center
-        centered.lineSpacing = 1
-        centered.paragraphSpacing = 3
-
-        func attrs(_ size: CGFloat, weight: NSFont.Weight = .regular,
-                   color: NSColor = .labelColor) -> [NSAttributedString.Key: Any] {
-            [
-                .font: NSFont.systemFont(ofSize: size, weight: weight),
-                .foregroundColor: color,
-                .paragraphStyle: centered
-            ]
+        if let window {
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
         }
 
-        credits.append(NSAttributedString(
-            string: "A native macOS Markdown viewer.\n\n",
-            attributes: attrs(11)
-        ))
-
-        credits.append(NSAttributedString(string: "Shortcuts\n", attributes: attrs(11, weight: .semibold)))
-        credits.append(NSAttributedString(
-            string: """
-            ⌘O  Open folder    ⌘P  Quick open
-            ⌘F  Find in file    ⇧⌘F  Find in folders
-            ⌘G / ⇧⌘G  Next / previous match    Esc  Close
-
-            """,
-            attributes: attrs(11)
-        ))
-
-        credits.append(NSAttributedString(string: "Created by ", attributes: attrs(11)))
-        credits.append(NSAttributedString(
-            string: "Adjie Purbojati  ·  ",
-            attributes: attrs(11, weight: .semibold)
-        ))
-
-        let linkText = "github.com/purbojati/supermd"
-        let link = NSMutableAttributedString(string: linkText, attributes: [
-            .font: NSFont.systemFont(ofSize: 11),
-            .foregroundColor: NSColor.linkColor,
-            .underlineStyle: NSUnderlineStyle.single.rawValue,
-            .link: URL(string: "https://github.com/purbojati/supermd")!,
-            .paragraphStyle: centered
-        ])
-        credits.append(link)
-
-        let info = Bundle.main.infoDictionary
-        let shortVersion = info?["CFBundleShortVersionString"] as? String ?? ""
-        let buildVersion = info?["CFBundleVersion"] as? String ?? ""
-
-        NSApp.orderFrontStandardAboutPanel(options: [
-            .credits: credits,
-            .applicationName: "SuperMD",
-            .applicationVersion: shortVersion,
-            .version: buildVersion,
-            .init(rawValue: "Copyright"): "© 2026 Adjie Purbojati · MIT License"
-        ])
+        let hosting = NSHostingController(rootView: AboutView())
+        let w = NSWindow(contentViewController: hosting)
+        w.styleMask = [.titled, .closable, .fullSizeContentView]
+        w.titleVisibility = .hidden
+        w.titlebarAppearsTransparent = true
+        w.isMovableByWindowBackground = true
+        w.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        w.standardWindowButton(.zoomButton)?.isHidden = true
+        w.backgroundColor = .clear
+        w.isOpaque = false
+        w.hasShadow = true
+        w.isReleasedWhenClosed = false
+        w.setContentSize(NSSize(width: 380, height: 480))
+        w.center()
+        window = w
+        w.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+}
+
+private struct AboutView: View {
+    @AppStorage(ThemePalette.storageKey) private var themeRaw: String = ThemePalette.rose.rawValue
+
+    private var theme: ThemePalette {
+        ThemePalette(rawValue: themeRaw) ?? .rose
+    }
+
+    private var versionLine: String {
+        let info = Bundle.main.infoDictionary
+        let short = info?["CFBundleShortVersionString"] as? String
+        let build = info?["CFBundleVersion"] as? String
+        switch (short, build) {
+        case let (s?, b?) where !s.isEmpty && !b.isEmpty && s != b:
+            return "Version \(s) (\(b))"
+        case let (s?, _) where !s.isEmpty:
+            return "Version \(s)"
+        default:
+            return "Development build"
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            VStack(spacing: 10) {
+                if let icon = NSApp.applicationIconImage {
+                    Image(nsImage: icon)
+                        .resizable()
+                        .interpolation(.high)
+                        .frame(width: 96, height: 96)
+                        .shadow(color: .black.opacity(0.18), radius: 8, y: 4)
+                }
+                Text("SuperMD")
+                    .font(.system(size: 26, weight: .semibold, design: .serif))
+                    .foregroundStyle(Theme.text)
+                Text(versionLine)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Theme.secondaryText)
+                Text("A native macOS Markdown viewer.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.secondaryText)
+            }
+            .padding(.top, 28)
+            .padding(.bottom, 18)
+
+            shortcutsCard
+                .padding(.horizontal, 24)
+
+            Spacer(minLength: 16)
+
+            footer
+                .padding(.horizontal, 24)
+                .padding(.bottom, 18)
+        }
+        .frame(width: 380, height: 480)
+        .background(Theme.background)
+        .preferredColorScheme(theme.preferredColorScheme)
+    }
+
+    private var shortcutsCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Shortcuts")
+                .font(.system(size: 10, weight: .semibold))
+                .tracking(0.9)
+                .textCase(.uppercase)
+                .foregroundStyle(Theme.accent)
+                .padding(.horizontal, 14)
+                .padding(.top, 10)
+                .padding(.bottom, 8)
+            VStack(spacing: 4) {
+                row("⌘O",          "Open folder")
+                row("⌘P",          "Quick open")
+                row("⌘F",          "Find in file")
+                row("⇧⌘F",         "Find in folders")
+                row("⌘G / ⇧⌘G",    "Next / previous match")
+                row("Esc",          "Close overlay")
+            }
+            .padding(.horizontal, 14)
+            .padding(.bottom, 12)
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Theme.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Theme.border, lineWidth: 1)
+        )
+    }
+
+    private func row(_ key: String, _ label: String) -> some View {
+        HStack(spacing: 12) {
+            Text(key)
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .foregroundStyle(Theme.text)
+                .frame(width: 96, alignment: .leading)
+            Text(label)
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.secondaryText)
+            Spacer(minLength: 0)
+        }
+    }
+
+    private var footer: some View {
+        VStack(spacing: 4) {
+            HStack(spacing: 5) {
+                Text("Created by")
+                    .foregroundStyle(Theme.secondaryText)
+                Text("Adjie Purbojati")
+                    .foregroundStyle(Theme.text)
+                    .fontWeight(.semibold)
+            }
+            .font(.system(size: 11))
+
+            Link("github.com/purbojati/supermd",
+                 destination: URL(string: "https://github.com/purbojati/supermd")!)
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.accent)
+
+            Text("© 2026 Adjie Purbojati  ·  MIT License")
+                .font(.system(size: 10))
+                .foregroundStyle(Theme.tertiaryText)
+                .padding(.top, 2)
+        }
     }
 }
