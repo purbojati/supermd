@@ -137,8 +137,8 @@ enum AboutPanel {
 
         let centered = NSMutableParagraphStyle()
         centered.alignment = .center
-        centered.lineSpacing = 3
-        centered.paragraphSpacing = 6
+        centered.lineSpacing = 1
+        centered.paragraphSpacing = 3
 
         func attrs(_ size: CGFloat, weight: NSFont.Weight = .regular,
                    color: NSColor = .labelColor) -> [NSAttributedString.Key: Any] {
@@ -150,35 +150,16 @@ enum AboutPanel {
         }
 
         credits.append(NSAttributedString(
-            string: "A native macOS Markdown viewer with a three-pane layout: folder browser, rendered Markdown, and a heading-based table of contents.\n\n",
-            attributes: attrs(11)
-        ))
-
-        credits.append(NSAttributedString(string: "Features\n", attributes: attrs(11, weight: .semibold)))
-        credits.append(NSAttributedString(
-            string: """
-            • Multi-folder sidebar with nested Markdown browsing
-            • Find in file & full-folder search
-            • Quick-open palette for any file in open folders
-            • Live reload when files change on disk
-            • Mermaid diagrams with one-click PNG export
-            • Eight light & dark themes
-            • Heading-synced table of contents
-            • Universal binary (Apple Silicon + Intel)
-
-            """,
+            string: "A native macOS Markdown viewer.\n\n",
             attributes: attrs(11)
         ))
 
         credits.append(NSAttributedString(string: "Shortcuts\n", attributes: attrs(11, weight: .semibold)))
         credits.append(NSAttributedString(
             string: """
-            ⌘O   Open folder
-            ⌘P   Quick open file
-            ⌘F   Find in file
-            ⇧⌘F  Find in folders
-            ⌘G / ⇧⌘G   Next / previous match
-            Esc   Close overlay
+            ⌘O  Open folder    ⌘P  Quick open
+            ⌘F  Find in file    ⇧⌘F  Find in folders
+            ⌘G / ⇧⌘G  Next / previous match    Esc  Close
 
             """,
             attributes: attrs(11)
@@ -186,7 +167,7 @@ enum AboutPanel {
 
         credits.append(NSAttributedString(string: "Created by ", attributes: attrs(11)))
         credits.append(NSAttributedString(
-            string: "Adjie Purbojati\n",
+            string: "Adjie Purbojati  ·  ",
             attributes: attrs(11, weight: .semibold)
         ))
 
@@ -199,8 +180,6 @@ enum AboutPanel {
             .paragraphStyle: centered
         ])
         credits.append(link)
-        credits.append(NSAttributedString(string: "\n\nBuilt with SwiftUI and apple/swift-markdown.",
-                                          attributes: attrs(10, color: .secondaryLabelColor)))
 
         let info = Bundle.main.infoDictionary
         let shortVersion = info?["CFBundleShortVersionString"] as? String ?? ""
