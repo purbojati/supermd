@@ -190,6 +190,8 @@ struct CodeBlockView: View {
     let codeBlock: CodeBlock
     @AppStorage(ThemePalette.storageKey) private var _palette: String = ThemePalette.rose.rawValue
     @Environment(\.findQuery) private var findQuery
+    @State private var isHovering = false
+    @State private var isCopied = false
 
     private var attributedCode: AttributedString {
         var attr = AttributedString(codeBlock.code.trimmingCharacters(in: .newlines))
@@ -233,6 +235,48 @@ struct CodeBlockView: View {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .stroke(Theme.border, lineWidth: 1)
         )
+        .overlay(alignment: .topTrailing) {
+            if isHovering || isCopied {
+                CodeCopyButton(isCopied: isCopied) {
+                    let code = codeBlock.code.trimmingCharacters(in: .newlines)
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(code, forType: .string)
+                    isCopied = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        isCopied = false
+                    }
+                }
+                .padding(8)
+                .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.15), value: isHovering)
+        .onHover { isHovering = $0 }
+    }
+}
+
+private struct CodeCopyButton: View {
+    let isCopied: Bool
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: isCopied ? "checkmark" : "doc.on.doc")
+                    .imageScale(.small)
+                Text(isCopied ? "Copied" : "Copy")
+                    .font(.system(size: 11, weight: .medium))
+            }
+            .foregroundStyle(isCopied ? Color.green : Theme.accent)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(hovering ? Theme.accentSoft.opacity(1.4) : Theme.accentSoft)
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help("Copy code to clipboard")
     }
 }
 

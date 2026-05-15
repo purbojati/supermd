@@ -4,6 +4,7 @@ import AppKit
 struct ContentView: View {
     private static let openFoldersKey = "openFolders"
 
+    @EnvironmentObject private var appDelegate: SuperMDAppDelegate
     @State private var rootURLs: [URL] = ContentView.loadStoredFolders()
     @State private var selectedFile: URL?
     @State private var rawText: String = ""
@@ -183,6 +184,10 @@ struct ContentView: View {
         }
         .onAppear {
             watcher.watch(selectedFile)
+            if let url = appDelegate.pendingFileURL {
+                openFile(url)
+                appDelegate.pendingFileURL = nil
+            }
         }
         .onReceive(watcher.changed) { _ in
             // Our own atomic save fires the watcher — ignore that brief echo.
@@ -221,6 +226,22 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .saveFileRequest)) { _ in
             performSaveNow()
         }
+        .onChange(of: appDelegate.pendingFileURL) { _, url in
+            if let url {
+                openFile(url)
+                appDelegate.pendingFileURL = nil
+            }
+        }
+    }
+
+    // MARK: - File opening
+
+    private func openFile(_ url: URL) {
+        let parent = url.deletingLastPathComponent()
+        if !rootURLs.contains(parent) {
+            rootURLs.append(parent)
+        }
+        selectedFile = url
     }
 
     // MARK: - Edit mode
