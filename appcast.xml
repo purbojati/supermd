@@ -6,13 +6,13 @@
     <description>Most recent SuperMD updates</description>
     <language>en</language>
     <item>
-      <title>Version 0.1.1</title>
-      <pubDate>Fri, 15 May 2026 14:15:15 +0000</pubDate>
-      <sparkle:version>0.1.1</sparkle:version>
-      <sparkle:shortVersionString>0.1.1</sparkle:shortVersionString>
+      <title>Version 0.1.2</title>
+      <pubDate>Fri, 15 May 2026 14:58:23 +0000</pubDate>
+      <sparkle:version>0.1.2</sparkle:version>
+      <sparkle:shortVersionString>0.1.2</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <sparkle:releaseNotesLink>https://github.com/purbojati/supermd/releases/tag/v0.1.1</sparkle:releaseNotesLink>
-      <enclosure url="https://github.com/purbojati/supermd/releases/download/v0.1.1/SuperMD.zip" length="5543435" type="application/octet-stream" sparkle:edSignature="ONOHGownOCVy0pGRCgAKCSYU79AVf429zkV33WCa5aWNJNa6KWvLDUjhEtrPQwJnMPepz8NqZL7WYGw8DQYdAQ==" length="5543435" />
+      <sparkle:releaseNotesLink>https://github.com/purbojati/supermd/releases/tag/v0.1.2</sparkle:releaseNotesLink>
+      <enclosure url="https://github.com/purbojati/supermd/releases/download/v0.1.2/SuperMD-0.1.2.zip" type="application/octet-stream" sparkle:edSignature="yUR0WXU4UKhqJ+qIkbYn6ElGMI2QHZktuzNm/yEVMLfbfjuSnUTCqMGB506x4qYL/Wm0uNs6V3Z57yfspUzqAw==" length="5672376" />
     </item>
   </channel>
 </rss>

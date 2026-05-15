@@ -78,18 +78,55 @@ for variant in "" "-Dark"; do
   fi
 done
 
-echo "==> Ad-hoc codesign (inner-bundles first, then app)"
-# Sign Sparkle's nested helpers explicitly so the embedded framework verifies.
+# Identity selection:
+#   - If DEVELOPER_ID_IDENTITY is set, use it (e.g. "Developer ID Application: Name (TEAMID)").
+#   - Otherwise auto-detect a Developer ID Application identity in the keychain.
+#   - If none is found, fall back to ad-hoc (local dev builds).
+IDENTITY="${DEVELOPER_ID_IDENTITY:-}"
+if [[ -z "$IDENTITY" ]]; then
+  IDENTITY="$(security find-identity -v -p codesigning 2>/dev/null \
+    | awk -F '"' '/Developer ID Application/ {print $2; exit}')"
+fi
+
+ENTITLEMENTS="Resources/SuperMD.entitlements"
+if [[ -n "$IDENTITY" ]]; then
+  echo "==> Codesigning with: $IDENTITY (hardened runtime, timestamped)"
+  SIGN_ARGS=(--force --options runtime --timestamp --sign "$IDENTITY")
+else
+  echo "==> No Developer ID identity found — ad-hoc signing (local dev build)"
+  SIGN_ARGS=(--force --sign -)
+fi
+
+# Sparkle ships its helpers ad-hoc signed with empty entitlements. We must
+# re-sign them with Developer ID + hardened runtime + timestamp. Don't use
+# --preserve-metadata: Sparkle's pre-shipped Designated Requirement references
+# the adhoc signature, and preserving it drags the adhoc flag back in.
 SPARKLE_FW="$APP_BUNDLE/Contents/Frameworks/Sparkle.framework"
 if [[ -d "$SPARKLE_FW" ]]; then
+  # Sign deepest first: XPC helpers, then Updater.app, then Autoupdate, then
+  # the framework wrapper itself.
+  # `Versions/Current` is a symlink — use -L so find follows it. Without -L
+  # the loop silently iterates zero helpers and they keep Sparkle's original
+  # ad-hoc signatures, which notarization rejects.
   while IFS= read -r -d '' helper; do
-    codesign --force --sign - --timestamp=none "$helper"
-  done < <(find "$SPARKLE_FW/Versions/Current" \
+    codesign "${SIGN_ARGS[@]}" "$helper"
+  done < <(find -L "$SPARKLE_FW/Versions/Current" \
               \( -name "*.xpc" -o -name "Autoupdate" -o -name "Updater.app" \) \
               -print0 2>/dev/null)
-  codesign --force --sign - --timestamp=none "$SPARKLE_FW"
+  codesign "${SIGN_ARGS[@]}" "$SPARKLE_FW"
 fi
-codesign --force --deep --sign - "$APP_BUNDLE"
+
+# Sign the main bundle last with entitlements (only meaningful when we have a real identity).
+if [[ -n "$IDENTITY" ]]; then
+  codesign "${SIGN_ARGS[@]}" --entitlements "$ENTITLEMENTS" "$APP_BUNDLE"
+else
+  codesign --force --deep --sign - "$APP_BUNDLE"
+fi
+
+if [[ -n "$IDENTITY" ]]; then
+  echo "==> Verifying signature"
+  codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
+fi
 
 echo "==> Zipping for distribution"
 ZIP_PATH="$BUILD_DIR/$APP_NAME.zip"
