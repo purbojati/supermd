@@ -9,6 +9,7 @@ struct ContentView: View {
     @State private var parsed: ParsedMarkdown = ParsedMarkdown(text: "")
     @State private var scrollTargetID: String?
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @StateObject private var search = SearchState()
     @AppStorage("contentWidth") private var contentWidthRaw: String = ContentWidth.normal.rawValue
     @AppStorage(ThemePalette.storageKey) private var themeRaw: String = ThemePalette.rose.rawValue
 
@@ -29,8 +30,22 @@ struct ContentView: View {
             )
             .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 360)
         } content: {
-            MarkdownPaneView(parsed: parsed, scrollTarget: $scrollTargetID, contentWidth: contentWidth)
-                .navigationSplitViewColumnWidth(min: 400, ideal: 640)
+            VStack(spacing: 0) {
+                if search.findBarVisible {
+                    FindBar(state: search) {
+                        search.closeFindBar()
+                    }
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
+                MarkdownPaneView(
+                    parsed: parsed,
+                    scrollTarget: $scrollTargetID,
+                    contentWidth: contentWidth,
+                    currentMatchBlockID: search.currentMatchBlockID,
+                    findQuery: search.findQuery
+                )
+            }
+            .navigationSplitViewColumnWidth(min: 400, ideal: 640)
         } detail: {
             TableOfContentsView(headings: parsed.headings, currentID: scrollTargetID) { id in
                 scrollTargetID = id
@@ -50,20 +65,57 @@ struct ContentView: View {
                 .help("Open Folder (⌘O)")
             }
             ToolbarItem(placement: .primaryAction) {
+                Button {
+                    search.openFolderSearch()
+                } label: {
+                    Label("Search in Folders", systemImage: "magnifyingglass")
+                }
+                .help("Search in Folders (⇧⌘F)")
+                .disabled(rootURLs.isEmpty)
+            }
+            ToolbarItem(placement: .primaryAction) {
                 ContentWidthMenu(raw: $contentWidthRaw)
             }
             ToolbarItem(placement: .primaryAction) {
                 ThemeMenu(raw: $themeRaw)
             }
         }
+        .sheet(isPresented: $search.folderSearchVisible) {
+            FolderSearchView(
+                state: search,
+                rootURLs: rootURLs,
+                onSelect: { url, query in
+                    selectedFile = url
+                    search.closeFolderSearch()
+                    // Carry the query into the in-file find bar so the user
+                    // lands on the file with highlights already applied.
+                    search.findQuery = query
+                    search.openFindBar()
+                },
+                onClose: { search.closeFolderSearch() }
+            )
+        }
+        .animation(.easeOut(duration: 0.15), value: search.findBarVisible)
         .onChange(of: selectedFile) { _, newValue in
             loadMarkdown(from: newValue)
+            search.updateMatches(in: parsed)
+        }
+        .onChange(of: search.findQuery) { _, _ in
+            search.updateMatches(in: parsed)
         }
         .onChange(of: rootURLs) { _, urls in
             UserDefaults.standard.set(urls.map { $0.path }, forKey: Self.openFoldersKey)
         }
         .onReceive(NotificationCenter.default.publisher(for: .openFolderRequest)) { _ in
             openFolder()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .findInFileRequest)) { _ in
+            search.openFindBar()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .folderSearchRequest)) { _ in
+            if !rootURLs.isEmpty {
+                search.openFolderSearch()
+            }
         }
     }
 

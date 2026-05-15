@@ -258,6 +258,17 @@ enum Theme {
     static var codeBackground: Color { color(palette.codeBackground) }
     static var inlineCodeFill: Color { color(palette.inlineCodeFill) }
 
+    // Search match highlight — a warm yellow that reads on both light and
+    // dark palettes. Fixed (not palette-bound) so matches always stand out.
+    static var findHighlight: Color {
+        let isDark = ThemePalette.current.preferredColorScheme == .dark
+        return Color(.sRGB,
+                     red:   1.0,
+                     green: isDark ? 0.78 : 0.86,
+                     blue:  isDark ? 0.22 : 0.20,
+                     opacity: isDark ? 0.55 : 0.65)
+    }
+
     // Hex strings for HTML (mermaid). Bound to current palette.
     static var backgroundHex:     String { hex(palette.background) }
     static var textHex:           String { hex(palette.text) }

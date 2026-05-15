@@ -28,12 +28,25 @@ struct SuperMDApp: App {
                 }
                 .keyboardShortcut("o", modifiers: [.command])
             }
+            CommandGroup(after: .pasteboard) {
+                Divider()
+                Button("Find…") {
+                    NotificationCenter.default.post(name: .findInFileRequest, object: nil)
+                }
+                .keyboardShortcut("f", modifiers: [.command])
+                Button("Find in Folders…") {
+                    NotificationCenter.default.post(name: .folderSearchRequest, object: nil)
+                }
+                .keyboardShortcut("f", modifiers: [.command, .shift])
+            }
         }
     }
 }
 
 extension Notification.Name {
-    static let openFolderRequest = Notification.Name("supermd.openFolderRequest")
+    static let openFolderRequest    = Notification.Name("supermd.openFolderRequest")
+    static let findInFileRequest    = Notification.Name("supermd.findInFileRequest")
+    static let folderSearchRequest  = Notification.Name("supermd.folderSearchRequest")
 }
 
 // macOS does not yet support per-appearance app icons via .appiconset

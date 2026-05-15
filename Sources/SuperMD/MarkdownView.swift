@@ -49,6 +49,8 @@ struct MarkdownPaneView: View {
     let parsed: ParsedMarkdown
     @Binding var scrollTarget: String?
     let contentWidth: ContentWidth
+    let currentMatchBlockID: String?
+    let findQuery: String
     // Observed so changing the palette re-evaluates this view (and all
     // `BlockView`s it produces) with fresh `Theme.*` colors.
     @AppStorage(ThemePalette.storageKey) private var _palette: String = ThemePalette.rose.rawValue
@@ -71,16 +73,28 @@ struct MarkdownPaneView: View {
                 } else {
                     LazyVStack(spacing: Typography.blockSpacing) {
                         ForEach(parsed.blocks) { entry in
-                            if isMermaidBlock(entry.markup) {
-                                // Mermaid manages its own width (follows the text column
-                                // by default, expands to full pane when toggled).
-                                BlockView(markup: entry.markup, textColumnWidth: textColumnWidth)
-                                    .id(entry.id)
-                            } else {
-                                BlockView(markup: entry.markup, textColumnWidth: textColumnWidth)
-                                    .id(entry.id)
-                                    .frame(maxWidth: textColumnWidth, alignment: .leading)
+                            let isCurrent = entry.id == currentMatchBlockID
+                            Group {
+                                if isMermaidBlock(entry.markup) {
+                                    // Mermaid manages its own width (follows the text column
+                                    // by default, expands to full pane when toggled).
+                                    BlockView(markup: entry.markup, textColumnWidth: textColumnWidth)
+                                } else {
+                                    BlockView(markup: entry.markup, textColumnWidth: textColumnWidth)
+                                        .frame(maxWidth: textColumnWidth, alignment: .leading)
+                                }
                             }
+                            .id(entry.id)
+                            .padding(.horizontal, isCurrent ? 8 : 0)
+                            .padding(.vertical, isCurrent ? 4 : 0)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .stroke(Theme.accentBorder, lineWidth: isCurrent ? 2 : 0)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                            .fill(isCurrent ? Theme.accentSoft : Color.clear)
+                                    )
+                            )
                         }
                     }
                     .padding(.horizontal, Typography.gutterPadding)
@@ -94,10 +108,17 @@ struct MarkdownPaneView: View {
                 }
             }
             .background(Theme.background)
+            .environment(\.findQuery, findQuery)
             .onChange(of: scrollTarget) { _, target in
                 guard let target else { return }
                 withAnimation(.easeInOut(duration: 0.25)) {
                     proxy.scrollTo(target, anchor: .top)
+                }
+            }
+            .onChange(of: currentMatchBlockID) { _, target in
+                guard let target else { return }
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    proxy.scrollTo(target, anchor: .center)
                 }
             }
         }
@@ -110,13 +131,14 @@ struct BlockView: View {
     let markup: Markup
     let textColumnWidth: CGFloat
     @AppStorage(ThemePalette.storageKey) private var _palette: String = ThemePalette.rose.rawValue
+    @Environment(\.findQuery) private var findQuery
 
     var body: some View {
         switch markup {
         case let heading as Heading:
             HeadingBlockView(heading: heading)
         case let paragraph as Paragraph:
-            Text(inlineAttributedString(from: paragraph))
+            Text(applyFindHighlights(inlineAttributedString(from: paragraph), query: findQuery))
                 .font(Typography.body)
                 .lineSpacing(Typography.bodyLineSpacing)
                 .foregroundStyle(Theme.text)
@@ -151,9 +173,10 @@ struct BlockView: View {
 struct HeadingBlockView: View {
     let heading: Heading
     @AppStorage(ThemePalette.storageKey) private var _palette: String = ThemePalette.rose.rawValue
+    @Environment(\.findQuery) private var findQuery
 
     var body: some View {
-        Text(inlineAttributedString(from: heading))
+        Text(applyFindHighlights(inlineAttributedString(from: heading), query: findQuery))
             .font(Typography.heading(level: heading.level))
             .foregroundStyle(Theme.text)
             .padding(.top, Typography.headingTopPadding(level: heading.level))
@@ -166,6 +189,13 @@ struct HeadingBlockView: View {
 struct CodeBlockView: View {
     let codeBlock: CodeBlock
     @AppStorage(ThemePalette.storageKey) private var _palette: String = ThemePalette.rose.rawValue
+    @Environment(\.findQuery) private var findQuery
+
+    private var attributedCode: AttributedString {
+        var attr = AttributedString(codeBlock.code.trimmingCharacters(in: .newlines))
+        attr.foregroundColor = Theme.text
+        return applyFindHighlights(attr, query: findQuery)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -188,10 +218,9 @@ struct CodeBlockView: View {
                 )
             }
             ScrollView(.horizontal, showsIndicators: false) {
-                Text(codeBlock.code.trimmingCharacters(in: .newlines))
+                Text(attributedCode)
                     .font(.system(size: 13, design: .monospaced))
                     .lineSpacing(3)
-                    .foregroundStyle(Theme.text)
                     .textSelection(.enabled)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 14)
