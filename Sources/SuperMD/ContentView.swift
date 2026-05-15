@@ -10,6 +10,8 @@ struct ContentView: View {
     @State private var scrollTargetID: String?
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @StateObject private var search = SearchState()
+    @StateObject private var quickOpen = QuickOpenState()
+    @StateObject private var watcher = FileWatcher()
     @AppStorage("contentWidth") private var contentWidthRaw: String = ContentWidth.normal.rawValue
     @AppStorage(ThemePalette.storageKey) private var themeRaw: String = ThemePalette.rose.rawValue
 
@@ -95,16 +97,34 @@ struct ContentView: View {
                 onClose: { search.closeFolderSearch() }
             )
         }
+        .sheet(isPresented: $quickOpen.visible) {
+            QuickOpenView(
+                state: quickOpen,
+                onSelect: { entry in
+                    selectedFile = entry.url
+                    quickOpen.close()
+                },
+                onClose: { quickOpen.close() }
+            )
+        }
         .animation(.easeOut(duration: 0.15), value: search.findBarVisible)
         .onChange(of: selectedFile) { _, newValue in
             loadMarkdown(from: newValue)
             search.updateMatches(in: parsed)
+            watcher.watch(newValue)
         }
         .onChange(of: search.findQuery) { _, _ in
             search.updateMatches(in: parsed)
         }
         .onChange(of: rootURLs) { _, urls in
             UserDefaults.standard.set(urls.map { $0.path }, forKey: Self.openFoldersKey)
+        }
+        .onAppear {
+            watcher.watch(selectedFile)
+        }
+        .onReceive(watcher.changed) { _ in
+            reloadCurrent()
+            search.updateMatches(in: parsed)
         }
         .onReceive(NotificationCenter.default.publisher(for: .openFolderRequest)) { _ in
             openFolder()
@@ -117,6 +137,17 @@ struct ContentView: View {
                 search.openFolderSearch()
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .quickOpenRequest)) { _ in
+            if !rootURLs.isEmpty {
+                quickOpen.open(roots: rootURLs)
+            }
+        }
+    }
+
+    private func reloadCurrent() {
+        guard let url = selectedFile else { return }
+        let text = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+        parsed = ParsedMarkdown(text: text)
     }
 
     private func openFolder() {

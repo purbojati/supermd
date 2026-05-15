@@ -39,6 +39,12 @@ struct SuperMDApp: App {
                 }
                 .keyboardShortcut("f", modifiers: [.command, .shift])
             }
+            CommandGroup(after: .newItem) {
+                Button("Quick Open…") {
+                    NotificationCenter.default.post(name: .quickOpenRequest, object: nil)
+                }
+                .keyboardShortcut("p", modifiers: [.command])
+            }
         }
     }
 }
@@ -47,6 +53,7 @@ extension Notification.Name {
     static let openFolderRequest    = Notification.Name("supermd.openFolderRequest")
     static let findInFileRequest    = Notification.Name("supermd.findInFileRequest")
     static let folderSearchRequest  = Notification.Name("supermd.folderSearchRequest")
+    static let quickOpenRequest     = Notification.Name("supermd.quickOpenRequest")
 }
 
 // macOS does not yet support per-appearance app icons via .appiconset
@@ -151,10 +158,27 @@ enum AboutPanel {
         credits.append(NSAttributedString(
             string: """
             • Multi-folder sidebar with nested Markdown browsing
+            • Find in file & full-folder search
+            • Quick-open palette for any file in open folders
+            • Live reload when files change on disk
             • Mermaid diagrams with one-click PNG export
-            • Light & dark themes with warm pink accents
+            • Eight light & dark themes
             • Heading-synced table of contents
             • Universal binary (Apple Silicon + Intel)
+
+            """,
+            attributes: attrs(11)
+        ))
+
+        credits.append(NSAttributedString(string: "Shortcuts\n", attributes: attrs(11, weight: .semibold)))
+        credits.append(NSAttributedString(
+            string: """
+            ⌘O   Open folder
+            ⌘P   Quick open file
+            ⌘F   Find in file
+            ⇧⌘F  Find in folders
+            ⌘G / ⇧⌘G   Next / previous match
+            Esc   Close overlay
 
             """,
             attributes: attrs(11)
