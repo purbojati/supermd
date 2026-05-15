@@ -129,11 +129,15 @@ enum AboutPanel {
         credits.append(NSAttributedString(string: "\n\nBuilt with SwiftUI and apple/swift-markdown.",
                                           attributes: attrs(10, color: .secondaryLabelColor)))
 
+        let info = Bundle.main.infoDictionary
+        let shortVersion = info?["CFBundleShortVersionString"] as? String ?? ""
+        let buildVersion = info?["CFBundleVersion"] as? String ?? ""
+
         NSApp.orderFrontStandardAboutPanel(options: [
             .credits: credits,
             .applicationName: "SuperMD",
-            .applicationVersion: "0.1.1",
-            .version: "2",
+            .applicationVersion: shortVersion,
+            .version: buildVersion,
             .init(rawValue: "Copyright"): "© 2026 Adjie Purbojati · MIT License"
         ])
         NSApp.activate(ignoringOtherApps: true)
