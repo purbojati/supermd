@@ -38,7 +38,7 @@ struct BlockEntry: Identifiable {
     let markup: Markup
 }
 
-private func isFullBleed(_ markup: Markup) -> Bool {
+private func isMermaidBlock(_ markup: Markup) -> Bool {
     if let cb = markup as? CodeBlock, (cb.language ?? "").lowercased() == "mermaid" {
         return true
     }
@@ -48,8 +48,10 @@ private func isFullBleed(_ markup: Markup) -> Bool {
 struct MarkdownPaneView: View {
     let parsed: ParsedMarkdown
     @Binding var scrollTarget: String?
+    let contentWidth: ContentWidth
 
     var body: some View {
+        let textColumnWidth = contentWidth.innerWidth
         ScrollViewReader { proxy in
             ScrollView {
                 if parsed.blocks.isEmpty {
@@ -66,14 +68,15 @@ struct MarkdownPaneView: View {
                 } else {
                     LazyVStack(spacing: Typography.blockSpacing) {
                         ForEach(parsed.blocks) { entry in
-                            if isFullBleed(entry.markup) {
-                                BlockView(markup: entry.markup)
+                            if isMermaidBlock(entry.markup) {
+                                // Mermaid manages its own width (follows the text column
+                                // by default, expands to full pane when toggled).
+                                BlockView(markup: entry.markup, textColumnWidth: textColumnWidth)
                                     .id(entry.id)
-                                    .frame(maxWidth: .infinity)
                             } else {
-                                BlockView(markup: entry.markup)
+                                BlockView(markup: entry.markup, textColumnWidth: textColumnWidth)
                                     .id(entry.id)
-                                    .frame(maxWidth: Typography.contentInnerWidth, alignment: .leading)
+                                    .frame(maxWidth: textColumnWidth, alignment: .leading)
                             }
                         }
                     }
@@ -97,6 +100,7 @@ struct MarkdownPaneView: View {
 
 struct BlockView: View {
     let markup: Markup
+    let textColumnWidth: CGFloat
 
     var body: some View {
         switch markup {
@@ -111,7 +115,7 @@ struct BlockView: View {
                 .fixedSize(horizontal: false, vertical: true)
         case let code as CodeBlock:
             if (code.language ?? "").lowercased() == "mermaid" {
-                MermaidBlockView(code: code.code)
+                MermaidBlockView(code: code.code, textColumnWidth: textColumnWidth)
             } else {
                 CodeBlockView(codeBlock: code)
             }
@@ -202,7 +206,7 @@ struct BlockQuoteView: View {
                 .frame(width: 3)
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(Array(quote.children.enumerated()), id: \.offset) { _, child in
-                    BlockView(markup: child)
+                    BlockView(markup: child, textColumnWidth: textColumnWidth)
                 }
             }
             .padding(.leading, 16)
@@ -211,6 +215,8 @@ struct BlockQuoteView: View {
             .italic()
         }
     }
+
+    private var textColumnWidth: CGFloat { ContentWidth.normal.innerWidth }
 }
 
 struct ListBlockView: View {
@@ -229,13 +235,15 @@ struct ListBlockView: View {
                         .frame(minWidth: 20, alignment: .trailing)
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(Array(item.children.enumerated()), id: \.offset) { _, child in
-                            BlockView(markup: child)
+                            BlockView(markup: child, textColumnWidth: textColumnWidth)
                         }
                     }
                 }
             }
         }
     }
+
+    private var textColumnWidth: CGFloat { ContentWidth.normal.innerWidth }
 
     private func bullet(for index: Int) -> String {
         ordered ? "\(index + 1)." : "•"

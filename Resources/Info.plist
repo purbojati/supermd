@@ -8,12 +8,16 @@
     <string>SuperMD</string>
     <key>CFBundleExecutable</key>
     <string>SuperMD</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>CFBundleIconName</key>
+    <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
     <string>com.github.supermd</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>2</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.1.0</string>
+    <string>0.1.1</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleInfoDictionaryVersion</key>
@@ -29,6 +33,16 @@
     <key>NSSupportsAutomaticTermination</key>
     <true/>
     <key>NSSupportsSuddenTermination</key>
+    <true/>
+    <key>SUFeedURL</key>
+    <string>https://raw.githubusercontent.com/purbojati/supermd/main/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>46uqRBEgyPvn4qAjA7F6AKG1eGuOVjeiSQC/q2WcG50=</string>
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+    <key>SUScheduledCheckInterval</key>
+    <integer>86400</integer>
+    <key>SUAllowsAutomaticUpdates</key>
     <true/>
     <key>CFBundleDocumentTypes</key>
     <array>

@@ -1,8 +1,11 @@
 import SwiftUI
 import AppKit
+import Sparkle
 
 @main
 struct SuperMDApp: App {
+    @NSApplicationDelegateAdaptor(SuperMDAppDelegate.self) private var appDelegate
+
     var body: some Scene {
         WindowGroup {
             ContentView()
@@ -13,6 +16,9 @@ struct SuperMDApp: App {
             CommandGroup(replacing: .appInfo) {
                 Button("About SuperMD") {
                     AboutPanel.show()
+                }
+                Button("Check for Updates…") {
+                    appDelegate.updaterController.checkForUpdates(nil)
                 }
             }
             CommandGroup(replacing: .newItem) {
@@ -27,6 +33,46 @@ struct SuperMDApp: App {
 
 extension Notification.Name {
     static let openFolderRequest = Notification.Name("supermd.openFolderRequest")
+}
+
+// macOS does not yet support per-appearance app icons via .appiconset
+// without the new Icon Composer .icon bundle. So we ship both .icns files
+// (AppIcon.icns + AppIcon-Dark.icns) and swap the running app's icon
+// to match the system appearance — the Dock and About panel update live.
+final class SuperMDAppDelegate: NSObject, NSApplicationDelegate {
+    let updaterController = SPUStandardUpdaterController(
+        startingUpdater: true,
+        updaterDelegate: nil,
+        userDriverDelegate: nil
+    )
+
+    private var appearanceObservation: NSKeyValueObservation?
+    private var lightIcon: NSImage?
+    private var darkIcon: NSImage?
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        lightIcon = loadIcon(named: "AppIcon")
+        darkIcon  = loadIcon(named: "AppIcon-Dark")
+        applyIcon()
+        appearanceObservation = NSApp.observe(\.effectiveAppearance, options: [.new]) { [weak self] _, _ in
+            self?.applyIcon()
+        }
+    }
+
+    private func loadIcon(named name: String) -> NSImage? {
+        if let url = Bundle.main.url(forResource: name, withExtension: "icns"),
+           let image = NSImage(contentsOf: url) {
+            return image
+        }
+        return nil
+    }
+
+    private func applyIcon() {
+        let isDark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        if let image = isDark ? (darkIcon ?? lightIcon) : (lightIcon ?? darkIcon) {
+            NSApp.applicationIconImage = image
+        }
+    }
 }
 
 enum AboutPanel {
@@ -86,8 +132,8 @@ enum AboutPanel {
         NSApp.orderFrontStandardAboutPanel(options: [
             .credits: credits,
             .applicationName: "SuperMD",
-            .applicationVersion: "0.1.0",
-            .version: "1",
+            .applicationVersion: "0.1.1",
+            .version: "2",
             .init(rawValue: "Copyright"): "© 2026 Adjie Purbojati · MIT License"
         ])
         NSApp.activate(ignoringOtherApps: true)

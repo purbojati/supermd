@@ -17,6 +17,9 @@ jobs:
       - name: Show Swift version
         run: swift --version
 
+      - name: Resolve Swift packages
+        run: swift package resolve
+
       - name: Build .app bundle
         run: ./scripts/build-app.sh
 
@@ -25,6 +28,75 @@ jobs:
         with:
           name: SuperMD-macOS
           path: .build/SuperMD.zip
+
+      - name: Sign update with Sparkle
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${SPARKLE_PRIVATE_KEY:-}" ]]; then
+            echo "SPARKLE_PRIVATE_KEY secret is not set" >&2
+            exit 1
+          fi
+          SIGN_TOOL="$(find .build/artifacts -name sign_update -type f -perm -u+x -print -quit)"
+          if [[ -z "${SIGN_TOOL:-}" ]]; then
+            echo "sign_update tool not found under .build/artifacts" >&2
+            exit 1
+          fi
+          KEY_FILE="$(mktemp)"
+          trap 'rm -f "$KEY_FILE"' EXIT
+          printf '%s' "$SPARKLE_PRIVATE_KEY" > "$KEY_FILE"
+          # sign_update prints: sparkle:edSignature="..." length="N"
+          SIG_ATTRS="$("$SIGN_TOOL" -f "$KEY_FILE" .build/SuperMD.zip)"
+          echo "SPARKLE_SIG_ATTRS=$SIG_ATTRS" >> "$GITHUB_ENV"
+
+      - name: Generate appcast.xml
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          SIZE=$(stat -f%z .build/SuperMD.zip)
+          DOWNLOAD_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/SuperMD.zip"
+          PUBDATE="$(date -u +'%a, %d %b %Y %H:%M:%S +0000')"
+          cat > appcast.xml <<EOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+            <channel>
+              <title>SuperMD</title>
+              <link>https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/appcast.xml</link>
+              <description>Most recent SuperMD updates</description>
+              <language>en</language>
+              <item>
+                <title>Version ${VERSION}</title>
+                <pubDate>${PUBDATE}</pubDate>
+                <sparkle:version>${VERSION}</sparkle:version>
+                <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
+                <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+                <sparkle:releaseNotesLink>https://github.com/${GITHUB_REPOSITORY}/releases/tag/${GITHUB_REF_NAME}</sparkle:releaseNotesLink>
+                <enclosure url="${DOWNLOAD_URL}" length="${SIZE}" type="application/octet-stream" ${SPARKLE_SIG_ATTRS} />
+              </item>
+            </channel>
+          </rss>
+          EOF
+
+      - name: Commit appcast.xml to main
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          set -euo pipefail
+          cp appcast.xml /tmp/appcast.xml
+          git fetch origin main
+          git checkout main
+          cp /tmp/appcast.xml appcast.xml
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- appcast.xml; then
+            echo "appcast.xml unchanged"
+          else
+            git add appcast.xml
+            git commit -m "appcast: ${GITHUB_REF_NAME}"
+            git push origin main
+          fi
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
@@ -38,3 +110,5 @@ jobs:
             1. Download `SuperMD.zip`, unzip it, and drag `SuperMD.app` into `/Applications`.
             2. First launch (unsigned app): right-click `SuperMD.app` → **Open** → **Open** in the dialog.
                Or run once in Terminal: `xattr -dr com.apple.quarantine /Applications/SuperMD.app`
+
+            Existing users will be notified of this update automatically via Sparkle.

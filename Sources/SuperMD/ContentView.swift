@@ -10,9 +10,14 @@ struct ContentView: View {
     @State private var scrollTargetID: String?
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @AppStorage("appearance") private var appearanceRaw: String = AppearanceMode.system.rawValue
+    @AppStorage("contentWidth") private var contentWidthRaw: String = ContentWidth.normal.rawValue
 
     private var appearance: AppearanceMode {
         AppearanceMode(rawValue: appearanceRaw) ?? .system
+    }
+
+    private var contentWidth: ContentWidth {
+        ContentWidth(rawValue: contentWidthRaw) ?? .normal
     }
 
     var body: some View {
@@ -24,7 +29,7 @@ struct ContentView: View {
             )
             .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 360)
         } content: {
-            MarkdownPaneView(parsed: parsed, scrollTarget: $scrollTargetID)
+            MarkdownPaneView(parsed: parsed, scrollTarget: $scrollTargetID, contentWidth: contentWidth)
                 .navigationSplitViewColumnWidth(min: 400, ideal: 640)
         } detail: {
             TableOfContentsView(headings: parsed.headings, currentID: scrollTargetID) { id in
@@ -43,6 +48,9 @@ struct ContentView: View {
                     Label("Open Folder", systemImage: "folder.badge.plus")
                 }
                 .help("Open Folder (⌘O)")
+            }
+            ToolbarItem(placement: .primaryAction) {
+                ContentWidthMenu(raw: $contentWidthRaw)
             }
             ToolbarItem(placement: .primaryAction) {
                 AppearanceMenu(raw: $appearanceRaw)

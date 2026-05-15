@@ -4,10 +4,12 @@ import AppKit
 
 struct MermaidBlockView: View {
     let code: String
+    let textColumnWidth: CGFloat
     @State private var height: CGFloat = 120
     @State private var errorMessage: String?
     @State private var copyRequest: UUID?
     @State private var copyState: CopyState = .idle
+    @State private var isFullWidth: Bool = false
     @Environment(\.colorScheme) private var colorScheme
 
     enum CopyState {
@@ -27,6 +29,7 @@ struct MermaidBlockView: View {
             .frame(height: height)
             .frame(maxWidth: .infinity)
         }
+        .frame(maxWidth: isFullWidth ? .infinity : textColumnWidth, alignment: .leading)
         .background(Theme.codeBackground)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay(
@@ -49,9 +52,14 @@ struct MermaidBlockView: View {
             .padding(8)
         }
         .overlay(alignment: .topTrailing) {
-            CopyButton(state: copyState) {
-                copyState = .idle
-                copyRequest = UUID()
+            HStack(spacing: 6) {
+                FullWidthToggle(isOn: isFullWidth) {
+                    isFullWidth.toggle()
+                }
+                CopyButton(state: copyState) {
+                    copyState = .idle
+                    copyRequest = UUID()
+                }
             }
             .padding(8)
         }
@@ -128,6 +136,33 @@ private struct CopyButton: View {
     private var background: Color {
         if hovering { return Theme.accentSoft.opacity(1.4) }
         return Theme.accentSoft
+    }
+}
+
+private struct FullWidthToggle: View {
+    let isOn: Bool
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: isOn
+                      ? "arrow.right.and.line.vertical.and.arrow.left"
+                      : "arrow.left.and.line.vertical.and.arrow.right")
+                    .imageScale(.small)
+                Text(isOn ? "Fit Column" : "Full Width")
+                    .font(.system(size: 11, weight: .medium))
+            }
+            .foregroundStyle(Theme.accent)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(hovering ? Theme.accentSoft.opacity(1.4) : Theme.accentSoft)
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help(isOn ? "Shrink diagram to text column width" : "Expand diagram to full pane width")
     }
 }
 
