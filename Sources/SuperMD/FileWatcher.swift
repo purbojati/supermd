@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import Darwin
+import CoreServices
 
 /// Watches a single file path for external changes (writes, atomic-save
 /// replaces, deletes). Editors commonly save by writing to a temp file and
@@ -62,5 +63,68 @@ final class FileWatcher: ObservableObject {
         }
         src.resume()
         source = src
+    }
+}
+
+/// Watches a set of directory roots (recursively) via FSEvents and emits on
+/// `changed` whenever anything inside them is added, removed, or renamed. The
+/// FileBrowser uses this to live-refresh its tree when files appear from
+/// outside the app (or another window).
+@MainActor
+final class FolderWatcher: ObservableObject {
+    let changed = PassthroughSubject<Void, Never>()
+
+    private var stream: FSEventStreamRef?
+
+    func watch(_ urls: [URL]) {
+        stop()
+        let paths = urls.map(\.path)
+        guard !paths.isEmpty else { return }
+
+        var ctx = FSEventStreamContext(
+            version: 0,
+            info: Unmanaged.passUnretained(self).toOpaque(),
+            retain: nil,
+            release: nil,
+            copyDescription: nil
+        )
+        let callback: FSEventStreamCallback = { _, info, _, _, _, _ in
+            guard let info else { return }
+            let watcher = Unmanaged<FolderWatcher>.fromOpaque(info).takeUnretainedValue()
+            DispatchQueue.main.async {
+                watcher.changed.send()
+            }
+        }
+
+        guard let s = FSEventStreamCreate(
+            kCFAllocatorDefault,
+            callback,
+            &ctx,
+            paths as CFArray,
+            FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
+            0.3,
+            FSEventStreamCreateFlags(kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagNoDefer)
+        ) else { return }
+
+        FSEventStreamSetDispatchQueue(s, .main)
+        FSEventStreamStart(s)
+        stream = s
+    }
+
+    func stop() {
+        if let s = stream {
+            FSEventStreamStop(s)
+            FSEventStreamInvalidate(s)
+            FSEventStreamRelease(s)
+        }
+        stream = nil
+    }
+
+    deinit {
+        if let s = stream {
+            FSEventStreamStop(s)
+            FSEventStreamInvalidate(s)
+            FSEventStreamRelease(s)
+        }
     }
 }

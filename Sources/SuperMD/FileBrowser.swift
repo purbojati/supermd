@@ -17,6 +17,7 @@ struct FileBrowserView: View {
 
     @State private var rootNodes: [FileNode] = []
     @AppStorage("expandedFolders") private var expandedRaw: String = ""
+    @StateObject private var folderWatcher = FolderWatcher()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -26,7 +27,10 @@ struct FileBrowserView: View {
         }
         .background(Theme.sidebar)
         .fontDesign(.rounded)
-        .onAppear { rebuildTree() }
+        .onAppear {
+            rebuildTree()
+            folderWatcher.watch(rootURLs)
+        }
         .onChange(of: rootURLs) { old, new in
             // New roots haven't been seen before: expand them by default so
             // users see their contents immediately. Persisted state for any
@@ -38,6 +42,10 @@ struct FileBrowserView: View {
                 current.formUnion(newlyAdded)
                 expandedRaw = Self.encode(current)
             }
+            rebuildTree()
+            folderWatcher.watch(new)
+        }
+        .onReceive(folderWatcher.changed) { _ in
             rebuildTree()
         }
     }
