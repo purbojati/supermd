@@ -25,6 +25,7 @@ struct FileBrowserView: View {
             content
         }
         .background(Theme.sidebar)
+        .fontDesign(.rounded)
         .onAppear { rebuildTree() }
         .onChange(of: rootURLs) { old, new in
             // New roots haven't been seen before: expand them by default so
@@ -44,24 +45,16 @@ struct FileBrowserView: View {
     private var header: some View {
         HStack(spacing: 6) {
             Text("Folders")
-                .font(.system(size: 10.5, weight: .semibold))
-                .tracking(0.8)
+                .font(.system(size: 10, weight: .semibold))
+                .tracking(0.5)
                 .textCase(.uppercase)
-                .foregroundStyle(Theme.accent)
+                .foregroundStyle(Theme.chromeHeader)
             Spacer()
-            Button(action: onAddFolder) {
-                Image(systemName: "plus")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Theme.accent)
-                    .frame(width: 22, height: 22)
-                    .background(Theme.accentSoft)
-                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-            }
-            .buttonStyle(.plain)
-            .help("Add Folder (⌘O)")
+            GhostIconButton(systemName: "plus", help: "Add Folder (⌘O)", action: onAddFolder)
         }
-        .padding(.horizontal, 12)
-        .padding(.top, 10)
+        .padding(.leading, 12)
+        .padding(.trailing, 8)
+        .padding(.top, 12)
         .padding(.bottom, 8)
     }
 
@@ -70,8 +63,8 @@ struct FileBrowserView: View {
         if rootURLs.isEmpty {
             VStack(spacing: 10) {
                 Image(systemName: "folder.badge.plus")
-                    .font(.system(size: 30, weight: .light))
-                    .foregroundStyle(Theme.accent.opacity(0.7))
+                    .font(.system(size: 28, weight: .light))
+                    .foregroundStyle(Theme.tertiaryText)
                 Text("No folders open")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Theme.secondaryText)
@@ -94,7 +87,7 @@ struct FileBrowserView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 1) {
+                LazyVStack(alignment: .leading, spacing: 2) {
                     ForEach(rootNodes) { node in
                         FileTreeRow(
                             node: node,
@@ -179,6 +172,26 @@ struct FileBrowserView: View {
 
 // MARK: - Tree row
 
+private enum FileTreeLayout {
+    /// Distance from FileTreeRow's leading edge to the start of row content.
+    /// Mirrors Tolaria: 6px row inset + 12px content inset.
+    static let rowInset: CGFloat = 6
+    static let contentInset: CGFloat = 12
+    /// Icon size matches Tolaria's 17px folder glyph.
+    static let iconSize: CGFloat = 17
+    static let iconTextGap: CGFloat = 8
+    /// Per-depth indent: icon width + gap, so a child's icon column lines up
+    /// where the parent's text used to start.
+    static let indentPerDepth: CGFloat = iconSize + iconTextGap // 25
+
+    /// X-offset of the vertical connector line for children of a parent at
+    /// `parentDepth`, measured from the FileTreeRow leading edge. Centers
+    /// through the parent's folder icon.
+    static func connectorOffset(forParentDepth parentDepth: Int) -> CGFloat {
+        rowInset + contentInset + CGFloat(parentDepth) * indentPerDepth + iconSize / 2 - 0.5
+    }
+}
+
 private struct FileTreeRow: View {
     let node: FileNode
     let depth: Int
@@ -191,20 +204,29 @@ private struct FileTreeRow: View {
 
     private var isExpanded: Bool { expandedPaths.contains(node.url.path) }
     private var isSelected: Bool { !node.isDirectory && selectedFile == node.url }
-    private var indent: CGFloat { CGFloat(depth) * 14 }
+    private var indent: CGFloat { CGFloat(depth) * FileTreeLayout.indentPerDepth }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 1) {
+        VStack(alignment: .leading, spacing: 2) {
             rowButton
-            if node.isDirectory, isExpanded, let children = node.children {
-                ForEach(children) { child in
-                    FileTreeRow(
-                        node: child,
-                        depth: depth + 1,
-                        selectedFile: $selectedFile,
-                        expandedPaths: $expandedPaths,
-                        rootURLs: $rootURLs
-                    )
+            if node.isDirectory, isExpanded, let children = node.children, !children.isEmpty {
+                ZStack(alignment: .topLeading) {
+                    Rectangle()
+                        .fill(Theme.dividerSoft)
+                        .frame(width: 1)
+                        .padding(.leading, FileTreeLayout.connectorOffset(forParentDepth: depth))
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        ForEach(children) { child in
+                            FileTreeRow(
+                                node: child,
+                                depth: depth + 1,
+                                selectedFile: $selectedFile,
+                                expandedPaths: $expandedPaths,
+                                rootURLs: $rootURLs
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -218,49 +240,52 @@ private struct FileTreeRow: View {
                 selectedFile = node.url
             }
         } label: {
-            HStack(spacing: 6) {
-                if node.isDirectory {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(Theme.tertiaryText)
-                        .frame(width: 10)
-                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                } else {
-                    Spacer().frame(width: 10)
-                }
-                Image(systemName: node.isDirectory ? (isExpanded ? "folder.fill" : "folder") : "doc.text")
-                    .foregroundStyle(node.isDirectory ? Theme.accent : Theme.secondaryText)
-                    .font(.system(size: 12))
-                    .frame(width: 16)
+            HStack(spacing: FileTreeLayout.iconTextGap) {
+                Image(systemName: rowIcon)
+                    .symbolRenderingMode(.monochrome)
+                    .foregroundStyle(iconColor)
+                    .font(.system(size: 14, weight: .regular))
+                    .frame(width: FileTreeLayout.iconSize, height: FileTreeLayout.iconSize)
                 Text(node.name)
-                    .font(.system(size: 13, weight: node.isRoot ? .semibold : .regular))
+                    .font(.system(size: 13, weight: node.isRoot ? .semibold : .medium))
                     .foregroundStyle(Theme.text)
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Spacer(minLength: 0)
             }
-            .padding(.leading, 8 + indent)
-            .padding(.trailing, 8)
-            .padding(.vertical, 4)
-            .background(rowBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+            .padding(.leading, FileTreeLayout.contentInset + indent)
+            .padding(.trailing, 16)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(rowBackground)
+            )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .padding(.horizontal, 6)
+        .padding(.horizontal, FileTreeLayout.rowInset)
         .onHover { hovering = $0 }
         .contextMenu { contextMenu }
     }
 
-    @ViewBuilder
-    private var rowBackground: some View {
-        if isSelected {
-            Theme.activeRow
-        } else if hovering {
-            Theme.hover
-        } else {
-            Color.clear
+    private var rowIcon: String {
+        if node.isDirectory {
+            return (isExpanded || isSelected) ? "folder.fill" : "folder"
         }
+        return "doc.text"
+    }
+
+    /// Folders use a slightly stronger secondary tone so the swap between
+    /// `folder` and `folder.fill` reads clearly; files stay muted.
+    private var iconColor: Color {
+        if node.isDirectory { return Theme.secondaryText }
+        return Theme.tertiaryText
+    }
+
+    private var rowBackground: Color {
+        if isSelected { return Theme.accentSoft }
+        if hovering { return Theme.hover }
+        return .clear
     }
 
     @ViewBuilder
