@@ -13,9 +13,9 @@ struct MarkdownSourceEditor: View {
             .foregroundStyle(Theme.text)
             .tint(Theme.accent)
             .scrollContentBackground(.hidden)
-            .background(Theme.surface)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
+            .background(Theme.elevated)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
     }
 }
 
@@ -33,7 +33,7 @@ struct EditorSplitPane: View {
         HSplitView {
             MarkdownSourceEditor(text: $text)
                 .frame(minWidth: 280, idealWidth: 460)
-                .background(Theme.surface)
+                .background(Theme.elevated)
             MarkdownPaneView(
                 parsed: parsed,
                 scrollTarget: $scrollTarget,

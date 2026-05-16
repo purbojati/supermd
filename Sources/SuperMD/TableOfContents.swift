@@ -20,14 +20,15 @@ struct TableOfContentsView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("Contents")
-                            .font(.system(size: 11, weight: .semibold))
-                            .tracking(0.8)
-                            .foregroundStyle(Theme.accent)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Outline")
+                            .font(.system(size: 10, weight: .semibold))
+                            .tracking(0.5)
+                            .foregroundStyle(Theme.chromeHeader)
                             .textCase(.uppercase)
-                            .padding(.horizontal, 14)
-                            .padding(.top, 14)
+                            .padding(.leading, 12)
+                            .padding(.trailing, 8)
+                            .padding(.top, 12)
                             .padding(.bottom, 8)
 
                         ForEach(headings) { heading in
@@ -43,8 +44,9 @@ struct TableOfContentsView: View {
                 .scrollContentBackground(.hidden)
             }
         }
-        .background(Theme.surface)
-        .navigationTitle("Contents")
+        .background(Theme.sidebar)
+        .fontDesign(.rounded)
+        .navigationTitle("Outline")
     }
 }
 
@@ -57,29 +59,30 @@ private struct TOCRow: View {
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 0) {
-                Rectangle()
-                    .fill(isActive ? Theme.accent : Color.clear)
-                    .frame(width: 2)
-                Spacer().frame(width: max(0, CGFloat((heading.level - 1) * 12)))
+                Spacer().frame(width: CGFloat(max(0, heading.level - 1)) * 12)
                 Text(heading.text)
                     .font(font(for: heading.level))
                     .foregroundStyle(foreground)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
-                    .padding(.leading, 10)
-                    .padding(.trailing, 12)
-                    .padding(.vertical, 4)
                 Spacer(minLength: 0)
             }
+            .padding(.leading, 12)
+            .padding(.trailing, 16)
+            .padding(.vertical, 5)
+            .background(
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(rowBackground)
+            )
             .contentShape(Rectangle())
-            .background(rowBackground)
         }
         .buttonStyle(.plain)
+        .padding(.horizontal, 6)
         .onHover { hovering = $0 }
     }
 
     private var foreground: Color {
-        if isActive { return Theme.accent }
+        if isActive { return Theme.text }
         if heading.level <= 2 { return Theme.text }
         return Theme.secondaryText
     }

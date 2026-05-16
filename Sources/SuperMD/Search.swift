@@ -208,10 +208,10 @@ struct FindBar: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 12))
-                .foregroundStyle(Theme.secondaryText)
+                .foregroundStyle(Theme.tertiaryText)
 
             TextField("Find in file", text: $state.findQuery)
                 .textFieldStyle(.plain)
@@ -222,45 +222,34 @@ struct FindBar: View {
             countLabel
 
             HStack(spacing: 2) {
-                Button(action: state.previousMatch) {
-                    Image(systemName: "chevron.up")
-                        .font(.system(size: 11, weight: .semibold))
-                        .frame(width: 22, height: 20)
-                }
-                .buttonStyle(.plain)
-                .disabled(state.matchBlockIDs.isEmpty)
-                .help("Previous match (⇧⌘G)")
+                FindBarStepButton(
+                    systemName: "chevron.up",
+                    enabled: !state.matchBlockIDs.isEmpty,
+                    help: "Previous match (⇧⌘G)",
+                    action: state.previousMatch
+                )
                 .keyboardShortcut("g", modifiers: [.command, .shift])
 
-                Button(action: state.nextMatch) {
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 11, weight: .semibold))
-                        .frame(width: 22, height: 20)
-                }
-                .buttonStyle(.plain)
-                .disabled(state.matchBlockIDs.isEmpty)
-                .help("Next match (⌘G)")
+                FindBarStepButton(
+                    systemName: "chevron.down",
+                    enabled: !state.matchBlockIDs.isEmpty,
+                    help: "Next match (⌘G)",
+                    action: state.nextMatch
+                )
                 .keyboardShortcut("g", modifiers: [.command])
             }
-            .foregroundStyle(Theme.secondaryText)
 
-            Button(action: onClose) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Theme.secondaryText)
-                    .frame(width: 22, height: 20)
-            }
-            .buttonStyle(.plain)
-            .help("Close (Esc)")
-            .keyboardShortcut(.escape, modifiers: [])
+            GhostIconButton(systemName: "xmark", help: "Close (Esc)", action: onClose)
+                .keyboardShortcut(.escape, modifiers: [])
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 7)
-        .background(Theme.sidebar)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(Theme.elevated)
         .overlay(
-            Rectangle().fill(Theme.border).frame(height: 1),
+            Rectangle().fill(Theme.dividerSoft).frame(height: 1),
             alignment: .bottom
         )
+        .fontDesign(.rounded)
         .onAppear { focused = true }
     }
 
@@ -269,15 +258,46 @@ struct FindBar: View {
         if state.findQuery.isEmpty {
             EmptyView()
         } else if state.matchBlockIDs.isEmpty {
-            Text("No results")
-                .font(.system(size: 11))
-                .foregroundStyle(Theme.tertiaryText)
+            StatusPill(text: "No results")
         } else {
-            Text("\(state.currentMatchIndex + 1) of \(state.matchBlockIDs.count)")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(Theme.secondaryText)
-                .monospacedDigit()
+            StatusPill(
+                text: "\(state.currentMatchIndex + 1) / \(state.matchBlockIDs.count)",
+                emphasized: true
+            )
         }
+    }
+}
+
+/// Find bar prev/next steppers. Like GhostIconButton but supports a disabled
+/// state, which the find shortcuts need.
+private struct FindBarStepButton: View {
+    let systemName: String
+    let enabled: Bool
+    let help: String
+    let action: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(foreground)
+                .frame(width: 22, height: 20)
+                .background(
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(hovering && enabled ? Theme.hover : Color.clear)
+                )
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .help(help)
+        .onHover { hovering = $0 }
+    }
+
+    private var foreground: Color {
+        if !enabled { return Theme.tertiaryText.opacity(0.6) }
+        return hovering ? Theme.text : Theme.secondaryText
     }
 }
 
@@ -293,18 +313,19 @@ struct FolderSearchView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            Divider().overlay(Theme.border)
+            Rectangle().fill(Theme.dividerSoft).frame(height: 1)
             results
         }
         .frame(width: 520, height: 560)
-        .background(Theme.background)
+        .background(Theme.elevated)
+        .fontDesign(.rounded)
     }
 
     private var header: some View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 14))
-                .foregroundStyle(Theme.secondaryText)
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.tertiaryText)
 
             TextField("Search in folders", text: $state.folderSearchQuery)
                 .textFieldStyle(.plain)
@@ -320,13 +341,8 @@ struct FolderSearchView: View {
                     .controlSize(.small)
             }
 
-            Button(action: onClose) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 14))
-                    .foregroundStyle(Theme.tertiaryText)
-            }
-            .buttonStyle(.plain)
-            .keyboardShortcut(.escape, modifiers: [])
+            GhostIconButton(systemName: "xmark", help: "Close (Esc)", action: onClose)
+                .keyboardShortcut(.escape, modifiers: [])
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
@@ -365,31 +381,24 @@ struct FolderSearchView: View {
     }
 
     private func resultGroup(_ result: FolderSearchResult) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
                 Image(systemName: "doc.text")
                     .font(.system(size: 11))
-                    .foregroundStyle(Theme.accent)
+                    .foregroundStyle(Theme.tertiaryText)
                 Text(displayPath(result))
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(Theme.secondaryText)
                     .lineLimit(1)
                     .truncationMode(.middle)
-                Text("\(result.matches.count)")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(Theme.tertiaryText)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 1)
-                    .background(
-                        Capsule().fill(Theme.hover)
-                    )
+                StatusPill(text: "\(result.matches.count)")
             }
             VStack(spacing: 1) {
                 ForEach(result.matches.prefix(10)) { match in
                     Button {
                         onSelect(result.url, state.folderSearchQuery)
                     } label: {
-                        HStack(alignment: .top, spacing: 8) {
+                        HStack(alignment: .top, spacing: 10) {
                             Text("\(match.lineNumber)")
                                 .font(.system(size: 11, design: .monospaced))
                                 .foregroundStyle(Theme.tertiaryText)
@@ -402,10 +411,10 @@ struct FolderSearchView: View {
                                 .truncationMode(.tail)
                             Spacer(minLength: 0)
                         }
-                        .padding(.vertical, 5)
-                        .padding(.horizontal, 6)
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, 8)
                         .background(
-                            RoundedRectangle(cornerRadius: 5)
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
                                 .fill(Theme.surface)
                         )
                         .contentShape(Rectangle())

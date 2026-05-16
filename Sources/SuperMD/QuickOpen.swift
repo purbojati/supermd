@@ -172,18 +172,19 @@ struct QuickOpenView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            Divider().overlay(Theme.border)
+            Rectangle().fill(Theme.dividerSoft).frame(height: 1)
             results
         }
         .frame(width: 560, height: 460)
-        .background(Theme.background)
+        .background(Theme.elevated)
+        .fontDesign(.rounded)
     }
 
     private var header: some View {
         HStack(spacing: 10) {
             Image(systemName: "doc.text.magnifyingglass")
-                .font(.system(size: 14))
-                .foregroundStyle(Theme.secondaryText)
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.tertiaryText)
 
             TextField("Jump to file", text: $state.query)
                 .textFieldStyle(.plain)
@@ -201,18 +202,10 @@ struct QuickOpenView: View {
                     return .handled
                 }
 
-            Text("\(state.filtered.count)")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(Theme.tertiaryText)
-                .monospacedDigit()
+            StatusPill(text: "\(state.filtered.count)")
 
-            Button(action: onClose) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 14))
-                    .foregroundStyle(Theme.tertiaryText)
-            }
-            .buttonStyle(.plain)
-            .keyboardShortcut(.escape, modifiers: [])
+            GhostIconButton(systemName: "xmark", help: "Close (Esc)", action: onClose)
+                .keyboardShortcut(.escape, modifiers: [])
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
@@ -228,15 +221,14 @@ struct QuickOpenView: View {
         } else {
             ScrollViewReader { proxy in
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 1) {
+                    LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(Array(state.filtered.enumerated()), id: \.element.id) { idx, entry in
                             row(entry, isSelected: idx == state.selectedIndex)
                                 .id(entry.id)
                                 .onTapGesture { onSelect(entry) }
                         }
                     }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 6)
                 }
                 .onChange(of: state.selectedIndex) { _, newValue in
                     guard state.filtered.indices.contains(newValue) else { return }
@@ -250,31 +242,33 @@ struct QuickOpenView: View {
     }
 
     private func row(_ entry: FileIndexEntry, isSelected: Bool) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: "doc.text")
-                .font(.system(size: 12))
-                .foregroundStyle(isSelected ? Theme.accent : Theme.secondaryText)
-                .frame(width: 18)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(entry.url.lastPathComponent)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Theme.text)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Text(entry.displayPath)
-                    .font(.system(size: 11))
-                    .foregroundStyle(Theme.tertiaryText)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+        HStack(spacing: 0) {
+            Rectangle()
+                .fill(isSelected ? Theme.accentBar : Color.clear)
+                .frame(width: 2)
+            HStack(spacing: 10) {
+                Image(systemName: "doc.text")
+                    .font(.system(size: 12))
+                    .foregroundStyle(isSelected ? Theme.accent : Theme.tertiaryText)
+                    .frame(width: 18)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(entry.url.lastPathComponent)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Theme.text)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Text(entry.displayPath)
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.tertiaryText)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                Spacer(minLength: 0)
             }
-            Spacer(minLength: 0)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 5, style: .continuous)
-                .fill(isSelected ? Theme.accentSoft : Color.clear)
-        )
+        .background(isSelected ? Theme.accentSoft : Color.clear)
         .contentShape(Rectangle())
     }
 

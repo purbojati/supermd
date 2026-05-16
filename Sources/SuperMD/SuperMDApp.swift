@@ -11,7 +11,7 @@ struct SuperMDApp: App {
             ContentView()
                 .frame(minWidth: 900, minHeight: 600)
         }
-        .windowToolbarStyle(.unified)
+        .windowToolbarStyle(.unifiedCompact(showsTitle: false))
         .commands {
             CommandGroup(replacing: .appInfo) {
                 Button("About SuperMD") {

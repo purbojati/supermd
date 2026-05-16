@@ -258,6 +258,20 @@ enum Theme {
     static var codeBackground: Color { color(palette.codeBackground) }
     static var inlineCodeFill: Color { color(palette.inlineCodeFill) }
 
+    // Chrome conventions for the Tolaria-style component pass.
+    // Section headers, status text, etc. read in a muted neutral, leaving
+    // the accent color reserved for active/selected state.
+    static var chromeHeader: Color { tertiaryText }
+
+    // Soft tinted pill backgrounds used for badges and small status chips.
+    // Tinted off `inlineCodeFill` so they sit naturally on `sidebar`/`surface`
+    // without ever competing with the accent.
+    static var pillFill: Color { color(palette.inlineCodeFill) }
+    static var pillText: Color { color(palette.secondaryText) }
+
+    // Accent variant for the active-row left indicator bar (a Tolaria signature).
+    static var accentBar: Color { color(palette.accent) }
+
     // Search match highlight — a warm yellow that reads on both light and
     // dark palettes. Fixed (not palette-bound) so matches always stand out.
     static var findHighlight: Color {
