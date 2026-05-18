@@ -91,6 +91,7 @@ struct ContentView: View {
                         findQuery: search.findQuery
                     )
                 }
+                FilePathBar(url: selectedFile)
             }
             .navigationSplitViewColumnWidth(min: 400, ideal: 640)
         } detail: {

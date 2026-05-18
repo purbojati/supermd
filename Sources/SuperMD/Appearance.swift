@@ -150,3 +150,67 @@ struct ContentWidthMenu: View {
         .menuIndicator(.hidden)
     }
 }
+
+struct FilePathBar: View {
+    let url: URL?
+    @AppStorage(ThemePalette.storageKey) private var _palette: String = ThemePalette.rose.rawValue
+    @State private var isCopied = false
+    @State private var copyResetTask: Task<Void, Never>?
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "doc.text")
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.tertiaryText)
+
+            Text(displayPath)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(Theme.secondaryText)
+                .lineLimit(1)
+                .truncationMode(.head)
+
+            Spacer(minLength: 0)
+
+            if let url {
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(url.path, forType: .string)
+                    isCopied = true
+                    copyResetTask?.cancel()
+                    copyResetTask = Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 1_500_000_000)
+                        if !Task.isCancelled { isCopied = false }
+                    }
+                } label: {
+                    Image(systemName: isCopied ? "checkmark" : "doc.on.doc")
+                        .font(.system(size: 11))
+                        .foregroundStyle(isCopied ? Theme.accent : Theme.tertiaryText)
+                }
+                .buttonStyle(.plain)
+                .help(isCopied ? "Copied!" : "Copy path")
+                .animation(.easeInOut(duration: 0.15), value: isCopied)
+
+                Button {
+                    NSWorkspace.shared.activateFileViewerSelecting([url])
+                } label: {
+                    Image(systemName: "arrow.right.circle")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.tertiaryText)
+                }
+                .buttonStyle(.plain)
+                .help("Reveal in Finder")
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 5)
+        .background(Theme.elevated)
+        .overlay(Rectangle().fill(Theme.dividerSoft).frame(height: 1), alignment: .top)
+    }
+
+    private var displayPath: String {
+        guard let url else { return "" }
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let full = url.path
+        return full.hasPrefix(home) ? "~" + full.dropFirst(home.count) : full
+    }
+}
