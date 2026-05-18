@@ -62,7 +62,8 @@ struct ContentView: View {
             FileBrowserView(
                 rootURLs: $rootURLs,
                 selectedFile: $selectedFile,
-                onAddFolder: openFolder
+                onAddFolder: openFolder,
+                onAddFile: openSingleFile
             )
             .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 360)
         } content: {
@@ -208,6 +209,9 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .openFolderRequest)) { _ in
             openFolder()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .openFileRequest)) { _ in
+            openSingleFile()
+        }
         .onReceive(NotificationCenter.default.publisher(for: .findInFileRequest)) { _ in
             search.openFindBar()
         }
@@ -302,6 +306,18 @@ struct ContentView: View {
             for url in panel.urls where !rootURLs.contains(url) {
                 rootURLs.append(url)
             }
+        }
+    }
+
+    private func openSingleFile() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Open"
+        panel.message = "Choose a Markdown file to open"
+        if panel.runModal() == .OK, let url = panel.url {
+            openFile(url)
         }
     }
 

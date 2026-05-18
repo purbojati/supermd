@@ -27,6 +27,10 @@ struct SuperMDApp: App {
                     NotificationCenter.default.post(name: .openFolderRequest, object: nil)
                 }
                 .keyboardShortcut("o", modifiers: [.command])
+                Button("Open File…") {
+                    NotificationCenter.default.post(name: .openFileRequest, object: nil)
+                }
+                .keyboardShortcut("o", modifiers: [.command, .shift])
             }
             CommandGroup(after: .pasteboard) {
                 Divider()
@@ -61,6 +65,7 @@ struct SuperMDApp: App {
 
 extension Notification.Name {
     static let openFolderRequest      = Notification.Name("supermd.openFolderRequest")
+    static let openFileRequest        = Notification.Name("supermd.openFileRequest")
     static let findInFileRequest      = Notification.Name("supermd.findInFileRequest")
     static let folderSearchRequest    = Notification.Name("supermd.folderSearchRequest")
     static let quickOpenRequest       = Notification.Name("supermd.quickOpenRequest")

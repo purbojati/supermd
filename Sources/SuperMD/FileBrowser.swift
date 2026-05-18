@@ -14,6 +14,7 @@ struct FileBrowserView: View {
     @Binding var rootURLs: [URL]
     @Binding var selectedFile: URL?
     let onAddFolder: () -> Void
+    let onAddFile: () -> Void
 
     @State private var rootNodes: [FileNode] = []
     @AppStorage("expandedFolders") private var expandedRaw: String = ""
@@ -58,7 +59,28 @@ struct FileBrowserView: View {
                 .textCase(.uppercase)
                 .foregroundStyle(Theme.chromeHeader)
             Spacer()
-            GhostIconButton(systemName: "plus", help: "Add Folder (⌘O)", action: onAddFolder)
+            Menu {
+                Button {
+                    onAddFile()
+                } label: {
+                    Label("Open File…", systemImage: "doc.badge.plus")
+                }
+                Button {
+                    onAddFolder()
+                } label: {
+                    Label("Add Folder…", systemImage: "folder.badge.plus")
+                }
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.secondaryText)
+                    .frame(width: 22, height: 22)
+                    .contentShape(Rectangle())
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("Add…")
         }
         .padding(.leading, 12)
         .padding(.trailing, 8)
@@ -76,7 +98,7 @@ struct FileBrowserView: View {
                 Text("No folders open")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Theme.secondaryText)
-                Text("Click + or press ⌘O to add a folder.")
+                Text("Click + to open a file or add a folder.")
                     .font(.system(size: 11))
                     .foregroundStyle(Theme.tertiaryText)
                     .multilineTextAlignment(.center)
