@@ -24,8 +24,10 @@ ENTITLEMENTS="Resources/SuperMD.entitlements"
 
 err()  { printf "\033[31merror:\033[0m %s\n" "$*" >&2; exit 1; }
 note() { printf "\033[1;34m==>\033[0m %s\n" "$*"; }
+warn() { printf "\033[33mwarning:\033[0m %s\n" "$*"; }
 
 # ---------------------------------------------------------------- preflight --
+
 
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$INFO_PLIST")"
 [[ -n "$VERSION" ]] || err "couldn't read version from $INFO_PLIST"

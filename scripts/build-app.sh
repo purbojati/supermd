@@ -91,7 +91,12 @@ fi
 ENTITLEMENTS="Resources/SuperMD.entitlements"
 if [[ -n "$IDENTITY" ]]; then
   echo "==> Codesigning with: $IDENTITY (hardened runtime, timestamped)"
-  SIGN_ARGS=(--force --options runtime --timestamp --sign "$IDENTITY")
+  # --runtime-version pins the hardened runtime version to 14.0.0 (matching
+  # LSMinimumSystemVersion) instead of letting codesign derive it from the
+  # active SDK. Without this, building on a beta SDK (e.g. macOS 26) embeds
+  # a future runtime version that macOS Sequoia doesn't recognise, causing a
+  # "malware" Gatekeeper warning for recipients on macOS 14/15.
+  SIGN_ARGS=(--force --options runtime --runtime-version 14.0.0 --timestamp --sign "$IDENTITY")
 else
   echo "==> No Developer ID identity found — ad-hoc signing (local dev build)"
   SIGN_ARGS=(--force --sign -)
